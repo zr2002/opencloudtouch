@@ -127,6 +127,23 @@ jobs:
           echo "=== Stage structure ==="
           find pi-gen/stage-opencloudtouch -type f | sort
 
+      - name: Fix Debian GPG keyring for bookworm
+        run: |
+          # Debian rotated signing keys - the bookworm keyring from debootstrap
+          # doesn't have the 2025+ keys. Copy the host's latest keyring into
+          # the pi-gen stage0 script so it's available in the rootfs before apt-get update.
+          cd pi-gen
+          sed -i '/^on_chroot/i \
+          # Fix: Copy latest Debian archive keyring from host to rootfs\
+          if [ -f /usr/share/keyrings/debian-archive-keyring.gpg ]; then\
+              cp /usr/share/keyrings/debian-archive-keyring.gpg "${ROOTFS_DIR}/usr/share/keyrings/debian-archive-keyring.pgp"\
+              echo "Updated debian-archive-keyring in rootfs"\
+          fi\
+          ' stage0/00-configure-apt/00-run.sh
+
+          echo "=== Patched stage0/00-configure-apt/00-run.sh ==="
+          cat stage0/00-configure-apt/00-run.sh
+
       - name: Set up QEMU for cross-architecture builds
         run: |
           sudo apt-get update
