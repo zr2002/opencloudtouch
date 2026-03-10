@@ -49,6 +49,8 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+asyncio_mode = "auto"
+addopts = "--strict-markers --tb=short --timeout=30"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -56,8 +58,6 @@ version = "1.0.0"
 tag_format = "v$version"
 update_changelog_on_bump = true
 bump_message = "chore(release): bump version to $new_version"
-asyncio_mode = "auto"
-addopts = "--strict-markers --tb=short"
 
 [tool.coverage.run]
 data_file = "../../.out/coverage/backend/.coverage"

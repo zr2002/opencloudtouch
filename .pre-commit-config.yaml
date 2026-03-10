@@ -89,47 +89,38 @@ repos:
   - repo: local
     hooks:
       # ========================================================================
-      # MANDATORY: ALL TESTS MUST PASS BEFORE COMMIT
+      # PRE-COMMIT: UNIT TESTS ONLY (fast, <60s)
       # ========================================================================
-      - id: all-tests-must-pass
-        name: "MANDATORY: Run ALL tests (Backend + Frontend + E2E) - 100% must pass"
-        entry: npm
-        args: [test]
+
+      # Backend Unit Tests (pre-commit)
+      - id: pytest-unit
+        name: Run backend unit tests (pre-commit)
+        entry: .venv/Scripts/python.exe
+        args: [-m, pytest, apps/backend/tests/unit, -x, --tb=short, -q, -n, auto, --timeout=30]
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
-        verbose: true
 
-      # Backend Tests (pre-push only)
-      - id: pytest-quick
-        name: Run backend unit tests (pre-push)
-        entry: .venv/Scripts/python.exe
-        args: [-m, pytest, apps/backend/tests/unit, -v, --tb=short, -x]
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]  # Only on push, not every commit
-
-      # Frontend Unit Tests (pre-push only)
+      # Frontend Unit Tests (pre-commit)
       - id: vitest
-        name: Run frontend unit tests (pre-push)
+        name: Run frontend unit tests (pre-commit)
         entry: npm
         args: [run, test, --prefix, apps/frontend]
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-push]
+        stages: [pre-commit]
 
-      # Frontend ESLint (pre-push only)
+      # Frontend ESLint (pre-commit)
       - id: eslint
-        name: Lint frontend (eslint, pre-push)
+        name: Lint frontend (eslint, pre-commit)
         entry: npm
         args: [run, lint, --prefix, apps/frontend]
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-push]
+        stages: [pre-commit]
 
       # Block deprecated .js test files (TypeScript migration complete)
       - id: no-js-tests
@@ -139,3 +130,15 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+
+      # ========================================================================
+      # PRE-PUSH: ALL TESTS (Backend + Frontend + E2E)
+      # ========================================================================
+      - id: all-tests-must-pass
+        name: "MANDATORY: Run ALL tests (Backend + Frontend + E2E) - 100% must pass"
+        entry: npm
+        args: [test]
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
