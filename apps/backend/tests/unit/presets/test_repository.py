@@ -437,7 +437,7 @@ class TestSchemaVersions:
     async def test_migration_robust_against_duplicate_column(self):
         """Regression test: DB already has source column but NO schema_versions.
 
-        This is the exact scenario that caused startup failure on myserver:
+        This is the exact scenario that caused startup failure on production:
         An older version of the code included 'source' directly in the base
         CREATE TABLE DDL.  When the new code with migration tracking runs,
         schema_versions is empty → migration tries ALTER TABLE ADD COLUMN source
@@ -446,7 +446,7 @@ class TestSchemaVersions:
         The fix: _apply_migration must catch 'duplicate column name' and treat
         it as an already-applied migration (idempotent).
 
-        Bug: Application startup failed on myserver after new image deployment.
+        Bug: Application startup failed on production after new image deployment.
         Fixed: 2026-03-05 — catch duplicate column name in _apply_migration.
         """
         import tempfile
@@ -477,7 +477,7 @@ class TestSchemaVersions:
                     """)
                 await db.commit()
 
-            # Must NOT raise — this is the myserver crash scenario
+            # Must NOT raise — this is the production crash scenario
             repo = PresetRepository(str(db_path))
             await repo.initialize()
 

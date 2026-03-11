@@ -106,7 +106,7 @@ class PresetRepository(BaseRepository):
         except Exception as e:  # noqa: BLE001
             # Treat "duplicate column name" as idempotent: the column was added
             # directly in the base DDL before migration tracking was introduced
-            # (e.g. on myserver the DB predates schema_versions).
+            # (e.g. a production DB that predates schema_versions).
             if "duplicate column name" in str(e).lower():
                 logger.info(
                     "Migration v%d: column already exists, marking as applied (idempotent)",

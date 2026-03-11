@@ -3,8 +3,8 @@
  *
  * BUG-35 Regression: useDiscoveryStream used hardcoded
  * "http://localhost:7777/api/devices/discover/stream" URL.
- * This caused ERR_CONNECTION_REFUSED on Myserver server because
- * browser accesses Myserver via its hostname, not localhost.
+ * This caused ERR_CONNECTION_REFUSED on remote server because
+ * browser accesses server via its hostname, not localhost.
  *
  * Fix: Use relative URL "/api/devices/discover/stream" so the
  * browser sends the request to the same origin as the UI.
