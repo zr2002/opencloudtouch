@@ -403,9 +403,7 @@ class TestStorePresetXMLFormat:
         assert 'type="stationurl"' in xml
         assert 'isPresetable="true"' in xml
         assert "<itemName>Radio Example</itemName>" in xml
-        assert (
-            'location="http://192.168.1.108:7777/core02/svc-bmx-adapter-orion' in xml
-        )
+        assert 'location="http://192.168.1.108:7777/core02/svc-bmx-adapter-orion' in xml
 
     @pytest.mark.asyncio
     async def test_xml_attributes_createdOn_updatedOn(self, adapter):
