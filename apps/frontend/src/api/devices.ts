@@ -212,3 +212,25 @@ export async function togglePlayPause(deviceId: string): Promise<void> {
     throw new Error(`Failed to toggle play/pause: ${response.statusText}`);
   }
 }
+
+export async function sendKey(deviceId: string, key: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/devices/${deviceId}/key?key=${encodeURIComponent(key)}&state=both`,
+    { method: "POST" }
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to send key ${key}: ${response.statusText}`);
+  }
+}
+
+export async function nextTrack(deviceId: string): Promise<void> {
+  return sendKey(deviceId, "NEXT_TRACK");
+}
+
+export async function prevTrack(deviceId: string): Promise<void> {
+  return sendKey(deviceId, "PREV_TRACK");
+}
+
+export async function power(deviceId: string): Promise<void> {
+  return sendKey(deviceId, "POWER");
+}

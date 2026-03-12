@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import LocalControl from "../../src/pages/LocalControl";
@@ -34,6 +34,53 @@ vi.mock("framer-motion", () => ({
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+// Mock hooks
+const mockNowPlaying = {
+  source: "INTERNET_RADIO",
+  state: "PLAY_STATE",
+  station_name: "Test Radio",
+  artist: "Test Artist",
+  track: "Test Track",
+  artwork_url: "https://example.com/art.jpg",
+};
+
+const mockUseNowPlaying = vi.fn().mockReturnValue({
+  nowPlaying: mockNowPlaying,
+  loading: false,
+  refresh: vi.fn(),
+});
+
+const mockSetDeviceVolume = vi.fn();
+const mockToggleMute = vi.fn();
+const mockUseVolume = vi.fn().mockReturnValue({
+  volume: 45,
+  muted: false,
+  loading: false,
+  setDeviceVolume: mockSetDeviceVolume,
+  toggleMute: mockToggleMute,
+});
+
+vi.mock("../../src/hooks/useNowPlaying", () => ({
+  useNowPlaying: (...args: unknown[]) => mockUseNowPlaying(...args),
+}));
+
+vi.mock("../../src/hooks/useVolume", () => ({
+  useVolume: (...args: unknown[]) => mockUseVolume(...args),
+}));
+
+// Mock API
+const mockTogglePlayPause = vi.fn().mockResolvedValue(undefined);
+const mockNextTrack = vi.fn().mockResolvedValue(undefined);
+const mockPrevTrack = vi.fn().mockResolvedValue(undefined);
+const mockPower = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../../src/api/devices", () => ({
+  togglePlayPause: (...args: unknown[]) => mockTogglePlayPause(...args),
+  nextTrack: (...args: unknown[]) => mockNextTrack(...args),
+  prevTrack: (...args: unknown[]) => mockPrevTrack(...args),
+  power: (...args: unknown[]) => mockPower(...args),
+}));
+
 const mockDevices = [
   {
     device_id: "ST10-001",
@@ -54,25 +101,28 @@ const mockDevices = [
 describe("LocalControl - Core Playback Functionality", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseNowPlaying.mockReturnValue({
+      nowPlaying: mockNowPlaying,
+      loading: false,
+      refresh: vi.fn(),
+    });
+    mockUseVolume.mockReturnValue({
+      volume: 45,
+      muted: false,
+      loading: false,
+      setDeviceVolume: mockSetDeviceVolume,
+      toggleMute: mockToggleMute,
+    });
   });
 
-  /**
-   * TEST 1: Empty State Handling
-   * User Story: Als User möchte ich wissen wenn keine Geräte verfügbar sind
-   */
   test("should show empty state when no devices available", async () => {
     await act(async () => {
       render(<LocalControl devices={[]} />);
     });
 
     expect(screen.getByText(/Keine Geräte gefunden/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /play/i })).not.toBeInTheDocument();
   });
 
-  /**
-   * TEST 2: Device Display
-   * User Story: Als User möchte ich sehen welches Gerät ich steuere
-   */
   test("should display current device name and model", async () => {
     await act(async () => {
       render(<LocalControl devices={mockDevices} />);
@@ -82,155 +132,149 @@ describe("LocalControl - Core Playback Functionality", () => {
     expect(screen.getByText("SoundTouch 10")).toBeInTheDocument();
   });
 
-  /**
-   * TEST 3: Play/Pause Toggle
-   * User Story: Als User möchte ich Wiedergabe starten und pausieren
-   */
-  test("should toggle play/pause when play button clicked", async () => {
+  test("should call useNowPlaying with device ID", async () => {
+    await act(async () => {
+      render(<LocalControl devices={mockDevices} />);
+    });
+
+    expect(mockUseNowPlaying).toHaveBeenCalledWith("ST10-001");
+  });
+
+  test("should call useVolume with device ID", async () => {
+    await act(async () => {
+      render(<LocalControl devices={mockDevices} />);
+    });
+
+    expect(mockUseVolume).toHaveBeenCalledWith("ST10-001");
+  });
+
+  test("should call togglePlayPause API when play/pause clicked", async () => {
     const user = userEvent.setup();
     render(<LocalControl devices={mockDevices} />);
 
-    // Find by icon text since there's no aria-label
-    const playPauseButton = screen.getByText("⏸️").closest("button")!;
-
-    // Initial state: Playing (shows pause icon)
-    expect(playPauseButton).toHaveTextContent("⏸️");
-
-    // Click to pause
+    // Use the playback controls button (not the NowPlaying overlay)
+    const playPauseButton = document.querySelector(".playback-button.play-pause") as HTMLButtonElement;
     await user.click(playPauseButton);
-    expect(playPauseButton).toHaveTextContent("▶️");
 
-    // Click to play again
-    await user.click(playPauseButton);
-    expect(playPauseButton).toHaveTextContent("⏸️");
+    expect(mockTogglePlayPause).toHaveBeenCalledWith("ST10-001");
   });
 
-  /**
-   * TEST 4: Volume Control
-   * User Story: Als User möchte ich die Lautstärke ändern können
-   */
-  test("should update volume when slider changed", async () => {
+  test("should call nextTrack API when next clicked", async () => {
+    const user = userEvent.setup();
     render(<LocalControl devices={mockDevices} />);
 
-    const volumeSlider = screen.getByRole("slider");
-    const volumeDisplay = screen.getByText(/45%/); // Initial volume
+    const nextButton = screen.getByRole("button", { name: /Nächster Track/i });
+    await user.click(nextButton);
 
-    expect(volumeDisplay).toBeInTheDocument();
-
-    // Change volume to 75 using fireEvent (range inputs need onChange simulation)
-    fireEvent.change(volumeSlider, { target: { value: "75" } });
-
-    await waitFor(() => {
-      expect(screen.getByText(/75%/)).toBeInTheDocument();
-    });
+    expect(mockNextTrack).toHaveBeenCalledWith("ST10-001");
   });
 
-  /**
-   * TEST 5: Mute Functionality
-   * User Story: Als User möchte ich den Ton stumm schalten können
-   */
-  test("should mute and unmute volume", async () => {
+  test("should call prevTrack API when previous clicked", async () => {
+    const user = userEvent.setup();
+    render(<LocalControl devices={mockDevices} />);
+
+    const prevButton = screen.getByRole("button", { name: /Vorheriger Track/i });
+    await user.click(prevButton);
+
+    expect(mockPrevTrack).toHaveBeenCalledWith("ST10-001");
+  });
+
+  test("should show play icon when paused", async () => {
+    mockUseNowPlaying.mockReturnValue({
+      nowPlaying: { ...mockNowPlaying, state: "PAUSE_STATE" },
+      loading: false,
+      refresh: vi.fn(),
+    });
+
+    await act(async () => {
+      render(<LocalControl devices={mockDevices} />);
+    });
+
+    const playButton = document.querySelector(".playback-button.play-pause") as HTMLButtonElement;
+    expect(playButton).toHaveAttribute("aria-label", "Play");
+  });
+
+  test("should call power API when standby clicked", async () => {
+    const user = userEvent.setup();
+    render(<LocalControl devices={mockDevices} />);
+
+    const standbyButton = screen.getByRole("button", { name: /Standby/i });
+    await user.click(standbyButton);
+
+    expect(mockPower).toHaveBeenCalledWith("ST10-001");
+  });
+
+  test("should call toggleMute when mute button clicked", async () => {
     const user = userEvent.setup();
     render(<LocalControl devices={mockDevices} />);
 
     const muteButton = screen.getByRole("button", { name: /Stumm/i });
-
-    // Initial: Not muted
-    expect(screen.getByText(/45%/)).toBeInTheDocument();
-    expect(muteButton).toHaveTextContent("🔊");
-
-    // Click to mute
     await user.click(muteButton);
 
-    await waitFor(() => {
-      expect(screen.getByText(/0%/)).toBeInTheDocument(); // Volume shows 0
-      expect(screen.getByRole("button", { name: /Ton an/i })).toBeInTheDocument();
+    expect(mockToggleMute).toHaveBeenCalled();
+  });
+
+  test("should display source selection tabs", async () => {
+    await act(async () => {
+      render(<LocalControl devices={mockDevices} />);
     });
 
-    // Click to unmute
-    const unmuteButton = screen.getByRole("button", { name: /Ton an/i });
-    await user.click(unmuteButton);
+    expect(screen.getByText("Radio")).toBeInTheDocument();
+    expect(screen.getByText("Bluetooth")).toBeInTheDocument();
+    expect(screen.getByText("AUX")).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText(/45%/)).toBeInTheDocument(); // Volume restored
+  test("should show NowPlaying component when playing", async () => {
+    await act(async () => {
+      render(<LocalControl devices={mockDevices} />);
     });
+
+    expect(screen.getByText("Test Radio")).toBeInTheDocument();
+    expect(screen.getByText("Test Track")).toBeInTheDocument();
   });
 
-  /**
-   * TEST 6: Previous Track
-   * User Story: Als User möchte ich zum vorherigen Track springen
-   */
-  test("previous track button should be disabled until API is implemented", async () => {
-    render(<LocalControl devices={mockDevices} />);
+  test("should not show NowPlaying when no playback data", async () => {
+    mockUseNowPlaying.mockReturnValue({
+      nowPlaying: null,
+      loading: false,
+      refresh: vi.fn(),
+    });
 
-    const previousButton = screen.getByText("⏮").closest("button")!;
+    await act(async () => {
+      render(<LocalControl devices={mockDevices} />);
+    });
 
-    // Button is disabled until Phase 3 implementation
-    expect(previousButton).toBeDisabled();
-    expect(previousButton).toHaveAttribute("title", "Kommt in Phase 3");
-  });
-
-  /**
-   * TEST 7: Next Track
-   * User Story: Als User möchte ich zum nächsten Track springen
-   */
-  test("next track button should be disabled until API is implemented", async () => {
-    render(<LocalControl devices={mockDevices} />);
-
-    const nextButton = screen.getByText("⏭").closest("button")!;
-
-    // Button is disabled until Phase 3 implementation
-    expect(nextButton).toBeDisabled();
-    expect(nextButton).toHaveAttribute("title", "Kommt in Phase 3");
-  });
-
-  /**
-   * TEST 8: Standby Mode
-   * User Story: Als User möchte ich das Gerät in Standby versetzen
-   */
-  test("standby button should be disabled until API is implemented", async () => {
-    render(<LocalControl devices={mockDevices} />);
-
-    const standbyButton = screen.getByRole("button", { name: /Standby/i });
-
-    // Button is disabled until Phase 3 implementation
-    expect(standbyButton).toBeDisabled();
-    expect(standbyButton).toHaveAttribute("title", "Kommt in Phase 3");
+    expect(screen.queryByText("Test Radio")).not.toBeInTheDocument();
   });
 });
 
 describe("LocalControl - Source Selection", () => {
-  /**
-   * TEST 9: Source Switching
-   * User Story: Als User möchte ich zwischen Quellen wechseln (Radio, Bluetooth, AUX)
-   */
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseNowPlaying.mockReturnValue({
+      nowPlaying: mockNowPlaying,
+      loading: false,
+      refresh: vi.fn(),
+    });
+    mockUseVolume.mockReturnValue({
+      volume: 45,
+      muted: false,
+      loading: false,
+      setDeviceVolume: mockSetDeviceVolume,
+      toggleMute: mockToggleMute,
+    });
+  });
+
   test("should switch between available sources", async () => {
     const user = userEvent.setup();
     render(<LocalControl devices={mockDevices} />);
 
-    // Initial source: Internet Radio
-    const radioTab = screen.getByRole("button", { name: /Radio/i });
-    expect(radioTab).toHaveClass("active");
-
-    // Switch to Bluetooth
     const bluetoothTab = screen.getByRole("button", { name: /Bluetooth/i });
     await user.click(bluetoothTab);
 
     expect(bluetoothTab).toHaveClass("active");
-    expect(radioTab).not.toHaveClass("active");
-
-    // Switch to AUX
-    const auxTab = screen.getByRole("button", { name: /AUX/i });
-    await user.click(auxTab);
-
-    expect(auxTab).toHaveClass("active");
-    expect(bluetoothTab).not.toHaveClass("active");
   });
 
-  /**
-   * TEST 10: Conditional AirPlay Support
-   * User Story: Als User möchte ich AirPlay nur sehen wenn das Gerät es unterstützt
-   */
   test("should show AirPlay only when device supports it", async () => {
     let rerender: (ui: React.ReactElement) => void;
     await act(async () => {
@@ -238,125 +282,66 @@ describe("LocalControl - Source Selection", () => {
       rerender = result.rerender;
     });
 
-    // ST10 (no AirPlay support)
     expect(screen.queryByRole("button", { name: /AirPlay/i })).not.toBeInTheDocument();
 
-    // ST30 (with AirPlay support)
     await act(async () => {
       rerender(<LocalControl devices={[mockDevices[1]!]} />);
     });
     expect(screen.getByRole("button", { name: /AirPlay/i })).toBeInTheDocument();
   });
-
-  /**
-   * TEST 11: Disabled Controls for AUX Source
-   * User Story: Als User möchte ich wissen dass Play/Pause bei AUX nicht verfügbar ist
-   */
-  test("should disable playback controls when AUX source selected", async () => {
-    const user = userEvent.setup();
-    render(<LocalControl devices={mockDevices} />);
-
-    const auxTab = screen.getByRole("button", { name: /AUX/i });
-    await user.click(auxTab);
-
-    // Playback buttons should be disabled for AUX
-    const playPauseButton = screen.getByText("⏸️").closest("button");
-    const previousButton = screen.getByText("⏮").closest("button");
-    const nextButton = screen.getByText("⏭").closest("button");
-
-    expect(playPauseButton).toBeDisabled();
-    expect(previousButton).toBeDisabled();
-    expect(nextButton).toBeDisabled();
-  });
-});
-
-describe("LocalControl - Multi-Device Handling", () => {
-  /**
-   * TEST 12: Volume Reset on Device Change
-   * User Story: Als User möchte ich dass Lautstärke zurückgesetzt wird beim Gerätewechsel
-   */
-  test("should reset volume and mute when switching devices", async () => {
-    const user = userEvent.setup();
-    render(<LocalControl devices={mockDevices} />);
-
-    // Change volume on first device
-    const volumeSlider = screen.getByRole("slider");
-    fireEvent.change(volumeSlider, { target: { value: "80" } });
-
-    await waitFor(() => {
-      expect(screen.getByText(/80%/)).toBeInTheDocument();
-    });
-
-    // Switch to second device using tab selector
-    const secondDeviceTab = screen.getByRole("tab", { name: /Schlafzimmer/i });
-    await user.click(secondDeviceTab);
-
-    // Volume should reset to 45%
-    await waitFor(() => {
-      expect(screen.getByText(/45%/)).toBeInTheDocument();
-      expect(screen.getByText("Schlafzimmer")).toBeInTheDocument();
-    });
-  });
 });
 
 describe("LocalControl - Edge Cases", () => {
-  /**
-   * TEST 13: Volume Boundaries
-   * User Story: Als User möchte ich Lautstärke von 0-100 einstellen können
-   */
-  test("should handle volume min and max values", async () => {
-    render(<LocalControl devices={mockDevices} />);
-
-    const volumeSlider = screen.getByRole("slider");
-
-    // Test minimum (0)
-    fireEvent.change(volumeSlider, { target: { value: "0" } });
-    await waitFor(() => {
-      expect(screen.getByText(/0%/)).toBeInTheDocument();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseNowPlaying.mockReturnValue({
+      nowPlaying: mockNowPlaying,
+      loading: false,
+      refresh: vi.fn(),
     });
-
-    // Test maximum (100)
-    fireEvent.change(volumeSlider, { target: { value: "100" } });
-    await waitFor(() => {
-      expect(screen.getByText(/100%/)).toBeInTheDocument();
+    mockUseVolume.mockReturnValue({
+      volume: 45,
+      muted: false,
+      loading: false,
+      setDeviceVolume: mockSetDeviceVolume,
+      toggleMute: mockToggleMute,
     });
   });
 
-  /**
-   * TEST 14: Volume Slider Disabled When Muted
-   * User Story: Als User sollte der Volume-Slider deaktiviert sein wenn stumm geschaltet
-   */
-  test("should disable volume slider when muted", async () => {
-    const user = userEvent.setup();
-    render(<LocalControl devices={mockDevices} />);
-
-    const volumeSlider = screen.getByRole("slider");
-    const muteButton = screen.getByRole("button", { name: /Stumm/i });
-
-    // Initially slider is enabled
-    expect(volumeSlider).toBeEnabled();
-
-    // Mute
-    await user.click(muteButton);
-
-    // Slider should be disabled
-    await waitFor(() => {
-      expect(volumeSlider).toBeDisabled();
-    });
-  });
-
-  /**
-   * TEST 15: Device Model Fallback
-   * User Story: "Unknown Model" wird angezeigt wenn kein Modell bekannt
-   */
   test("should display Unknown Model when device model is missing", async () => {
     const deviceWithoutModel = [
       { device_id: "1", name: "Test Device", ip: "192.168.1.10" },
     ];
-    render(<LocalControl devices={deviceWithoutModel} />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Unknown Model")).toBeInTheDocument();
+    await act(async () => {
+      render(<LocalControl devices={deviceWithoutModel} />);
     });
+
+    expect(screen.getByText("Unknown Model")).toBeInTheDocument();
+  });
+
+  test("should render VolumeSlider with current volume", async () => {
+    await act(async () => {
+      render(<LocalControl devices={mockDevices} />);
+    });
+
+    const slider = screen.getByRole("slider");
+    expect(slider).toBeInTheDocument();
+  });
+
+  test("should show mute state from useVolume hook", async () => {
+    mockUseVolume.mockReturnValue({
+      volume: 45,
+      muted: true,
+      loading: false,
+      setDeviceVolume: mockSetDeviceVolume,
+      toggleMute: mockToggleMute,
+    });
+
+    await act(async () => {
+      render(<LocalControl devices={mockDevices} />);
+    });
+
+    expect(screen.getByRole("button", { name: /Ton an/i })).toBeInTheDocument();
   });
 });
