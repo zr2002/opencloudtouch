@@ -136,7 +136,7 @@ describe("NowPlaying Component", () => {
   });
 
   describe("Missing Data Handling", () => {
-    it('should show "Unknown Station" when station not provided', () => {
+    it('should show "Kein Sender" when station not provided', () => {
       const nowPlaying = {
         track: "Test Track",
         play_status: "PLAY_STATE",
@@ -144,18 +144,18 @@ describe("NowPlaying Component", () => {
 
       render(<NowPlaying nowPlaying={nowPlaying} />);
 
-      expect(screen.getByText("Unknown Station")).toBeInTheDocument();
+      expect(screen.getByText("Kein Sender")).toBeInTheDocument();
     });
 
-    it('should show "Unknown Track" when track not provided', () => {
+    it("should not show track element when track not provided", () => {
       const nowPlaying = {
         station: "Test Station",
         play_status: "PLAY_STATE",
       };
 
-      render(<NowPlaying nowPlaying={nowPlaying} />);
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
 
-      expect(screen.getByText("Unknown Track")).toBeInTheDocument();
+      expect(container.querySelector(".np-track")).not.toBeInTheDocument();
     });
 
     it("should not display artist element when artist not provided", () => {
@@ -217,7 +217,7 @@ describe("NowPlaying Component", () => {
 
       render(<NowPlaying nowPlaying={nowPlaying} onPlayPause={vi.fn()} />);
 
-      expect(screen.getByText("Unknown Station")).toBeInTheDocument();
+      expect(screen.getByText("Kein Sender")).toBeInTheDocument();
       expect(screen.getByText("Unknown Artist Song")).toBeInTheDocument();
       expect(screen.getByText("🎵")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();

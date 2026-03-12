@@ -92,13 +92,24 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
         onIndexChange={setCurrentDeviceIndex}
       >
         <div className="control-card">
-          {/* Device Header */}
+          {/* Device Header: Power (left) | Name | Settings (right) */}
           <div className="control-card-header">
+            <div className="device-header-left">
+              <button
+                className="power-header-btn on"
+                onClick={() => handleKey("POWER", power)}
+                disabled={keyLoading === "POWER"}
+                aria-label="Ein/Ausschalten"
+                title="Ein/Ausschalten"
+              >
+                {keyLoading === "POWER" ? "⏳" : "⏻"}
+              </button>
+            </div>
             <div className="device-header-info">
               <h2 className="device-name">{currentDevice?.name}</h2>
               <span className="device-model">{currentDevice?.model || "Unknown Model"}</span>
             </div>
-            <div className="device-header-actions">
+            <div className="device-header-right">
               {currentDevice && (
                 <SetupBadge
                   deviceId={currentDevice.device_id}
@@ -213,15 +224,6 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
             <button className={`quick-action-button ${muted ? "active" : ""}`} onClick={toggleMute}>
               <span className="quick-action-icon">{muted ? "🔇" : "🔊"}</span>
               <span className="quick-action-label">{muted ? "Ton an" : "Stumm"}</span>
-            </button>
-            <button
-              className="quick-action-button standby"
-              onClick={() => handleKey("POWER", power)}
-              disabled={keyLoading === "POWER"}
-              aria-label="Standby"
-            >
-              <span className="quick-action-icon">{keyLoading === "POWER" ? "⏳" : "💤"}</span>
-              <span className="quick-action-label">Standby</span>
             </button>
           </motion.div>
         </div>

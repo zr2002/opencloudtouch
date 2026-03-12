@@ -194,12 +194,12 @@ describe("LocalControl - Core Playback Functionality", () => {
     expect(playButton).toHaveAttribute("aria-label", "Play");
   });
 
-  test("should call power API when standby clicked", async () => {
+  test("should call power API when power button clicked", async () => {
     const user = userEvent.setup();
     render(<LocalControl devices={mockDevices} />);
 
-    const standbyButton = screen.getByRole("button", { name: /Standby/i });
-    await user.click(standbyButton);
+    const powerButton = screen.getByRole("button", { name: /Ein\/Ausschalten/i });
+    await user.click(powerButton);
 
     expect(mockPower).toHaveBeenCalledWith("ST10-001");
   });

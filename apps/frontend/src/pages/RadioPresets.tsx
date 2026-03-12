@@ -8,7 +8,7 @@ import RadioSearch, { RadioStation } from "../components/RadioSearch";
 import VolumeSlider from "../components/VolumeSlider";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { PresetSkeleton } from "../components/LoadingSkeleton";
-import { playPreset as playPresetAPI, togglePlayPause } from "../api/devices";
+import { playPreset as playPresetAPI, togglePlayPause, power } from "../api/devices";
 import { usePresets } from "../hooks/usePresets";
 import { useVolume } from "../hooks/useVolume";
 import { useNowPlaying } from "../hooks/useNowPlaying";
@@ -34,7 +34,10 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
   const { show: showToast } = useToast();
   const [playError, setPlayError] = useState<string | null>(null);
   const [playLoading, setPlayLoading] = useState(false);
+  const [powerLoading, setPowerLoading] = useState(false);
   const [confirmClear, setConfirmClear] = useState<number | null>(null);
+
+  const isStandby = npState?.source === "STANDBY";
 
   // Map backend NowPlayingState to NowPlayingData for component
   const nowPlaying = npState
@@ -133,6 +136,25 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
       >
         <div className="device-card" data-test="device-card">
           <div className="device-card-header">
+            <button
+              className={`power-header-btn ${isStandby ? "off" : "on"}`}
+              onClick={async () => {
+                if (!currentDevice?.device_id || powerLoading) return;
+                setPowerLoading(true);
+                try {
+                  await power(currentDevice.device_id);
+                } catch (err) {
+                  console.error("[RadioPresets] Power failed:", err);
+                } finally {
+                  setPowerLoading(false);
+                }
+              }}
+              disabled={powerLoading}
+              aria-label="Ein/Ausschalten"
+              title="Ein/Ausschalten"
+            >
+              {powerLoading ? "⏳" : "⏻"}
+            </button>
             <div className="device-info">
               <h2 className="device-name" data-test="device-name">
                 {currentDevice?.name || "Unknown Device"}
