@@ -3,9 +3,14 @@ Device HTTP Client Interface
 Abstract base for device communication
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from opencloudtouch.zones.models import ZoneMemberInfo, ZoneStatus
 
 
 @dataclass
@@ -132,4 +137,33 @@ class DeviceClient(ABC):
             oct_backend_url: OCT backend base URL
             station_image_url: Optional station logo URL
         """
+        pass
+
+    # ---- Zone Methods ----
+
+    @abstractmethod
+    async def get_zone_status(self) -> ZoneStatus | None:
+        """Get current zone status. Returns None if not in a zone."""
+        pass
+
+    @abstractmethod
+    async def create_zone(
+        self, master_ip: str, members: list[ZoneMemberInfo]
+    ) -> ZoneStatus:
+        """Create a new multi-room zone with this device as master."""
+        pass
+
+    @abstractmethod
+    async def add_zone_members(self, members: list[ZoneMemberInfo]) -> None:
+        """Add members to existing zone (must be called on master)."""
+        pass
+
+    @abstractmethod
+    async def remove_zone_members(self, members: list[ZoneMemberInfo]) -> None:
+        """Remove members from existing zone (must be called on master)."""
+        pass
+
+    @abstractmethod
+    async def remove_zone(self) -> None:
+        """Dissolve entire zone (must be called on master)."""
         pass

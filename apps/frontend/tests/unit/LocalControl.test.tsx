@@ -81,6 +81,27 @@ vi.mock("../../src/api/devices", () => ({
   power: (...args: unknown[]) => mockPower(...args),
 }));
 
+// Mock useZones (STORY-1013)
+vi.mock("../../src/hooks/useZones", () => ({
+  useZones: () => ({
+    zones: [],
+    isLoading: false,
+    error: null,
+    createZone: vi.fn(),
+    dissolveZone: vi.fn(),
+    addMembers: vi.fn(),
+    removeMembers: vi.fn(),
+    changeMaster: vi.fn(),
+    refetch: vi.fn(),
+  }),
+}));
+
+// Mock react-router-dom
+const mockNavigate = vi.fn();
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate,
+}));
+
 const mockDevices = [
   {
     device_id: "ST10-001",

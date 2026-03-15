@@ -327,3 +327,84 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Zone Now Playing ---- */
+.zone-now-playing {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-surface-alt, rgba(0, 0, 0, 0.15));
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.zone-now-playing.standby {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* ---- Zone Member Volume ---- */
+.zone-member-volume {
+  margin-top: var(--space-xs);
+  padding: 0 var(--space-xs);
+}
+
+.zone-device-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ---- Editable Zone Name ---- */
+button.zone-name.editable {
+  all: unset;
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  border-bottom: 1px dashed var(--color-text-secondary);
+  transition: border-color 0.2s;
+}
+
+button.zone-name.editable:hover {
+  border-color: var(--color-accent);
+}
+
+.zone-name-input {
+  font-size: inherit;
+  font-weight: inherit;
+  background: var(--color-surface-alt, rgba(0, 0, 0, 0.15));
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: inherit;
+  padding: 2px 6px;
+  outline: none;
+  width: 200px;
+}
+
+/* ---- Set Master Button ---- */
+.set-master-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition:
+    color 0.2s,
+    transform 0.2s;
+}
+
+.set-master-btn:hover {
+  color: var(--color-accent);
+  transform: scale(1.2);
+}
+
+/* ---- Selection Info ---- */
+.selection-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}

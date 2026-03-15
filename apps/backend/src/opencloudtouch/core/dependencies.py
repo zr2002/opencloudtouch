@@ -12,6 +12,7 @@ from opencloudtouch.presets.service import PresetService
 from opencloudtouch.recents.repository import RecentsRepository
 from opencloudtouch.settings.repository import SettingsRepository
 from opencloudtouch.settings.service import SettingsService
+from opencloudtouch.zones.service import ZoneService
 
 
 async def get_device_repo(request: Request) -> DeviceRepository:
@@ -47,3 +48,8 @@ async def get_settings_repo(request: Request) -> SettingsRepository:
 async def get_settings_service(request: Request) -> SettingsService:
     """Get settings service instance from app.state (FastAPI dependency)."""
     return request.app.state.settings_service
+
+
+async def get_zone_service(request: Request) -> ZoneService:
+    """Get zone service instance from app.state (FastAPI dependency)."""
+    return request.app.state.zone_service

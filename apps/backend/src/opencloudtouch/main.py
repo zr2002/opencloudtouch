@@ -49,6 +49,7 @@ from opencloudtouch.settings.service import SettingsService
 from opencloudtouch.setup.routes import router as setup_router
 from opencloudtouch.setup.wizard_routes import wizard_router
 from opencloudtouch.swupdate.routes import router as swupdate_router
+from opencloudtouch.zones.routes import device_zone_router, router as zones_router
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -121,6 +122,13 @@ async def lifespan(app: FastAPI):
     )
     app.state.device_service = device_service
     logger.info("Device service initialized")
+
+    # Initialize zone service
+    from opencloudtouch.zones.service import ZoneService
+
+    zone_service = ZoneService(device_repo=device_repo)
+    app.state.zone_service = zone_service
+    logger.info("Zone service initialized")
 
     # Auto-discover devices on startup (especially mock devices)
     if cfg.mock_mode:
@@ -214,6 +222,8 @@ app.include_router(playlist_router)  # M3U/PLS playlist files for Bose presets
 app.include_router(setup_router)  # Device setup wizard
 app.include_router(wizard_router)  # SSH-driven wizard step endpoints
 app.include_router(swupdate_router)  # SWUpdate firmware index emulation
+app.include_router(zones_router)  # Multi-room zone management
+app.include_router(device_zone_router)  # Per-device zone status
 
 
 # Health endpoint

@@ -223,4 +223,103 @@ describe("NowPlaying Component", () => {
       expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
     });
   });
+
+  describe("Source Badge", () => {
+    it("should show Bluetooth badge when source is BLUETOOTH", () => {
+      const nowPlaying = {
+        station: "My Phone",
+        source: "BLUETOOTH",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(container.querySelector(".np-source-badge.bluetooth")).toBeInTheDocument();
+    });
+
+    it("should show Radio badge when source is INTERNET_RADIO", () => {
+      const nowPlaying = {
+        station: "Radio FM",
+        source: "INTERNET_RADIO",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(container.querySelector(".np-source-badge.radio")).toBeInTheDocument();
+    });
+
+    it("should show Radio badge when source is TUNEIN", () => {
+      const nowPlaying = {
+        station: "TuneIn Station",
+        source: "TUNEIN",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(container.querySelector(".np-source-badge.radio")).toBeInTheDocument();
+    });
+
+    it("should not show badge when no source provided", () => {
+      const nowPlaying = {
+        station: "Some Station",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(container.querySelector(".np-source-badge")).not.toBeInTheDocument();
+    });
+
+    it("should render badge SVG at 16px size", () => {
+      const nowPlaying = {
+        station: "My Phone",
+        source: "BLUETOOTH",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+      const svg = container.querySelector(".np-source-badge svg");
+
+      expect(svg).toHaveAttribute("width", "16");
+      expect(svg).toHaveAttribute("height", "16");
+    });
+  });
+
+  describe("Bluetooth Source Display", () => {
+    it('should show "Kein Gerät verbunden" for BLUETOOTH source without station', () => {
+      const nowPlaying = {
+        source: "BLUETOOTH",
+        play_status: "PLAY_STATE",
+      };
+
+      render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(screen.getByText("Kein Gerät verbunden")).toBeInTheDocument();
+    });
+
+    it("should show device name for BLUETOOTH source with station", () => {
+      const nowPlaying = {
+        station: "iPhone von Max",
+        source: "BLUETOOTH",
+        play_status: "PLAY_STATE",
+      };
+
+      render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(screen.getByText("iPhone von Max")).toBeInTheDocument();
+    });
+
+    it('should show "Kein Sender" for non-BLUETOOTH source without station', () => {
+      const nowPlaying = {
+        source: "INTERNET_RADIO",
+        play_status: "PLAY_STATE",
+      };
+
+      render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(screen.getByText("Kein Sender")).toBeInTheDocument();
+    });
+  });
 });

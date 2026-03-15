@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import DeviceSwiper, { Device } from "../components/DeviceSwiper";
 import NowPlaying from "../components/NowPlaying";
@@ -6,6 +7,7 @@ import VolumeSlider from "../components/VolumeSlider";
 import SetupBadge from "../components/SetupBadge";
 import { useNowPlaying } from "../hooks/useNowPlaying";
 import { useVolume } from "../hooks/useVolume";
+import { useZones } from "../hooks/useZones";
 import { togglePlayPause, nextTrack, prevTrack, power } from "../api/devices";
 import "./LocalControl.css";
 
@@ -34,11 +36,23 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
   const [selectedSource, setSelectedSource] = useState<SourceId>("INTERNET_RADIO");
   const [keyLoading, setKeyLoading] = useState<string | null>(null);
 
+  const navigate = useNavigate();
   const currentDevice = devices[currentDeviceIndex];
   const deviceId = currentDevice?.device_id;
 
   const { nowPlaying } = useNowPlaying(deviceId);
   const { volume, muted, setDeviceVolume, toggleMute } = useVolume(deviceId);
+  const { zones } = useZones();
+
+  const deviceZone = useMemo(() => {
+    if (!deviceId) return null;
+    return zones.find((z) => z.members.some((m) => m.device_id === deviceId)) ?? null;
+  }, [zones, deviceId]);
+
+  const deviceRole = useMemo(() => {
+    if (!deviceZone || !deviceId) return null;
+    return deviceZone.members.find((m) => m.device_id === deviceId)?.role ?? null;
+  }, [deviceZone, deviceId]);
 
   const isPlaying = nowPlaying?.state === "PLAY_STATE";
 
@@ -110,6 +124,15 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
               <span className="device-model">{currentDevice?.model || "Unknown Model"}</span>
             </div>
             <div className="device-header-right">
+              {deviceZone && (
+                <button
+                  className="zone-indicator-badge"
+                  onClick={() => navigate("/multiroom")}
+                  title={`Zone: ${deviceRole === "master" ? "Master" : "Slave"}`}
+                >
+                  🔗 {deviceRole === "master" ? "Master" : "Zone"}
+                </button>
+              )}
               {currentDevice && (
                 <SetupBadge
                   deviceId={currentDevice.device_id}
@@ -133,6 +156,7 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
                   artist: nowPlaying.artist,
                   art_url: nowPlaying.artwork_url,
                   play_status: nowPlaying.state,
+                  source: nowPlaying.source,
                 }}
                 onPlayPause={() => handleKey("PLAY_PAUSE", togglePlayPause)}
               />
@@ -224,6 +248,15 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
             <button className={`quick-action-button ${muted ? "active" : ""}`} onClick={toggleMute}>
               <span className="quick-action-icon">{muted ? "🔇" : "🔊"}</span>
               <span className="quick-action-label">{muted ? "Ton an" : "Stumm"}</span>
+            </button>
+            <button
+              className={`quick-action-button ${deviceZone ? "active" : ""}`}
+              onClick={() => navigate("/multiroom")}
+            >
+              <span className="quick-action-icon">🔗</span>
+              <span className="quick-action-label">
+                {deviceZone ? "Zone verwalten" : "Multi-Room"}
+              </span>
             </button>
           </motion.div>
         </div>

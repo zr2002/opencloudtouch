@@ -1161,31 +1161,6 @@ paths:
           content:
             application/json:
               schema: {}
-  /bmx/resolve:
-    post:
-      tags:
-      - bmx
-      summary: Resolve Stream
-      description: 'Resolve ContentItem to playable stream URL.
-
-
-        Bose devices call this endpoint with a ContentItem XML to resolve:
-
-        - TuneIn station IDs → direct stream URLs
-
-        - Direct stream URLs → pass through
-
-        - OCT stream proxy URLs → pass through
-
-
-        This mimics the original Bose BMX server (bmx.bose.com).'
-      operationId: resolve_stream_bmx_resolve_post
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
   /bmx/radiobrowser/v1/playback/station/{uuid}:
     get:
       tags:
@@ -1269,6 +1244,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /bmx/resolve:
+    post:
+      tags:
+      - bmx
+      summary: Resolve Stream
+      description: 'Resolve ContentItem to playable stream URL.
+
+
+        Bose devices call this endpoint with a ContentItem XML to resolve:
+
+        - TuneIn station IDs → direct stream URLs
+
+        - Direct stream URLs → pass through
+
+        - OCT stream proxy URLs → pass through
+
+
+        This mimics the original Bose BMX server (bmx.bose.com).'
+      operationId: resolve_stream_bmx_resolve_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
   /v1/systems/devices/{device_id}:
     get:
       tags:
@@ -1278,7 +1278,8 @@ paths:
         \ SoundTouch devices on boot to sync:\n- Presets (6 buttons)\n- Recents (recently\
         \ played)\n- Sources (available sources)\n\nArgs:\n    device_id: Device MAC\
         \ address (e.g., \"689E194F7D2F\")\n    preset_repo: Preset repository dependency\n\
-        \nReturns:\n    XML Response with <boseAccount> structure"
+        \    recents_repo: Recents repository dependency\n\nReturns:\n    XML Response\
+        \ with <boseAccount> structure"
       operationId: get_full_account_v1_systems_devices__device_id__get
       parameters:
       - name: device_id
@@ -1333,7 +1334,8 @@ paths:
       - marge
       summary: Get Recents
       description: "Get recently played items for device.\n\nArgs:\n    device_id:\
-        \ Device MAC address\n\nReturns:\n    XML Response with <recents> structure"
+        \ Device MAC address\n    recents_repo: Recents repository dependency\n\n\
+        Returns:\n    XML Response with <recents> structure"
       operationId: get_recents_v1_systems_devices__device_id__recents_get
       parameters:
       - name: device_id
@@ -2194,6 +2196,254 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /updates/soundtouch:
+    get:
+      tags:
+      - swupdate
+      summary: Firmware Index
+      description: 'Return firmware INDEX.XML for SoundTouch devices.
+
+
+        The device checks this endpoint at boot and periodically
+
+        to determine if a firmware update is available.'
+      operationId: firmware_index_updates_soundtouch_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /ced/eup/downloads/rel/{filename}:
+    get:
+      tags:
+      - swupdate
+      summary: Firmware Download
+      description: 'Redirect firmware download to device.
+
+
+        Firmware files are large (100+ MB). Instead of hosting them,
+
+        we return a 404 — OCT intentionally does NOT serve firmware
+
+        updates to prevent devices from updating to versions that
+
+        might break OCT compatibility.
+
+
+        In the future, this could proxy to archive.org for
+
+        specific firmware versions needed for downgrading.'
+      operationId: firmware_download_ced_eup_downloads_rel__filename__get
+      parameters:
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Filename
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/zones:
+    get:
+      tags:
+      - Zones
+      summary: Get All Zones
+      description: Get all active zones across all devices.
+      operationId: get_all_zones_api_zones_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ZoneStatus'
+                type: array
+                title: Response Get All Zones Api Zones Get
+    post:
+      tags:
+      - Zones
+      summary: Create Zone
+      description: Create a new multi-room zone.
+      operationId: create_zone_api_zones_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateZoneRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZoneStatus'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/zones/{master_id}:
+    delete:
+      tags:
+      - Zones
+      summary: Dissolve Zone
+      description: Dissolve an entire zone.
+      operationId: dissolve_zone_api_zones__master_id__delete
+      parameters:
+      - name: master_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Master Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/zones/{master_id}/members:
+    post:
+      tags:
+      - Zones
+      summary: Add Zone Members
+      description: Add members to an existing zone.
+      operationId: add_zone_members_api_zones__master_id__members_post
+      parameters:
+      - name: master_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Master Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModifyMembersRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZoneStatus'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Zones
+      summary: Remove Zone Members
+      description: Remove members from an existing zone.
+      operationId: remove_zone_members_api_zones__master_id__members_delete
+      parameters:
+      - name: master_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Master Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModifyMembersRequest'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/zones/{master_id}/master:
+    put:
+      tags:
+      - Zones
+      summary: Change Zone Master
+      description: Change the master of a zone (dissolve + recreate).
+      operationId: change_zone_master_api_zones__master_id__master_put
+      parameters:
+      - name: master_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Master Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeMasterRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZoneStatus'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/devices/{device_id}/zone:
+    get:
+      tags:
+      - Zones
+      summary: Get Device Zone
+      description: Get zone status for a specific device. Returns null if not in a
+        zone.
+      operationId: get_device_zone_api_devices__device_id__zone_get
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Device Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ZoneStatus'
+                - type: 'null'
+                title: Response Get Device Zone Api Devices  Device Id  Zone Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /health:
     get:
       tags:
@@ -2207,41 +2457,6 @@ paths:
           content:
             application/json:
               schema: {}
-  /updates/soundtouch:
-    get:
-      tags:
-      - swupdate
-      summary: Firmware Index
-      description: Return firmware INDEX.XML for SoundTouch devices.
-      operationId: firmware_index_updates_soundtouch_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/xml:
-              schema:
-                type: string
-  /ced/eup/downloads/rel/{filename}:
-    get:
-      tags:
-      - swupdate
-      summary: Firmware Download
-      description: Firmware download endpoint (blocked by OCT).
-      operationId: firmware_download_ced_eup_get
-      parameters:
-      - name: filename
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Filename
-      responses:
-        '404':
-          description: Firmware downloads disabled
-          content:
-            application/xml:
-              schema:
-                type: string
 components:
   schemas:
     BackupRequest:
@@ -2301,6 +2516,15 @@ components:
       required:
       - level
       title: Body_set_volume_api_devices__device_id__volume_put
+    ChangeMasterRequest:
+      properties:
+        new_master_id:
+          type: string
+          title: New Master Id
+      type: object
+      required:
+      - new_master_id
+      title: ChangeMasterRequest
     ConfigModifyRequest:
       properties:
         device_ip:
@@ -2356,6 +2580,21 @@ components:
       - ip
       title: ConnectivityCheckRequest
       description: Request to check device connectivity.
+    CreateZoneRequest:
+      properties:
+        master_id:
+          type: string
+          title: Master Id
+        slave_ids:
+          items:
+            type: string
+          type: array
+          title: Slave Ids
+      type: object
+      required:
+      - master_id
+      - slave_ids
+      title: CreateZoneRequest
     EnablePermanentSSHRequest:
       properties:
         device_id:
@@ -2470,6 +2709,17 @@ components:
       - ips
       title: ManualIPsResponse
       description: Response model for manual IPs list.
+    ModifyMembersRequest:
+      properties:
+        device_ids:
+          items:
+            type: string
+          type: array
+          title: Device Ids
+      type: object
+      required:
+      - device_ids
+      title: ModifyMembersRequest
     PortCheckRequest:
       properties:
         device_ip:
@@ -2756,6 +3006,11 @@ components:
         type:
           type: string
           title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
       type: object
       required:
       - loc
@@ -2806,6 +3061,58 @@ components:
       - message
       title: VerifyRedirectResponse
       description: Response with domain redirect verification result.
+    ZoneMemberInfo:
+      properties:
+        device_id:
+          type: string
+          title: Device Id
+        ip_address:
+          type: string
+          title: Ip Address
+        role:
+          type: string
+          title: Role
+          default: slave
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+      type: object
+      required:
+      - device_id
+      - ip_address
+      title: ZoneMemberInfo
+      description: A member device in a multi-room zone.
+    ZoneStatus:
+      properties:
+        master_id:
+          type: string
+          title: Master Id
+        master_ip:
+          type: string
+          title: Master Ip
+        is_master:
+          type: boolean
+          title: Is Master
+        members:
+          items:
+            $ref: '#/components/schemas/ZoneMemberInfo'
+          type: array
+          title: Members
+      type: object
+      required:
+      - master_id
+      - master_ip
+      - is_master
+      - members
+      title: ZoneStatus
+      description: Status of a multi-room zone.
     opencloudtouch__presets__api__routes__MessageResponse:
       properties:
         message:

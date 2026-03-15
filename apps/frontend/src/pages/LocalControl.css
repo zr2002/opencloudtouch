@@ -45,6 +45,28 @@
 
 .device-header-right {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.zone-indicator-badge {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-accent, #4fd1c5);
+  color: var(--color-bg, #1a1a2e);
+  font-size: 12px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.zone-indicator-badge:hover {
+  opacity: 0.85;
 }
 
 .device-name {

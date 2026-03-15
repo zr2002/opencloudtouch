@@ -47,6 +47,7 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
         track: npState.track,
         artist: npState.artist,
         play_status: npState.state,
+        source: npState.source,
       }
     : null;
 
@@ -176,7 +177,17 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
 
           <NowPlaying
             nowPlaying={nowPlaying}
-            onPlayPause={currentDevice ? () => togglePlayPause(currentDevice.device_id) : undefined}
+            onPlayPause={
+              currentDevice
+                ? async () => {
+                    if (isStandby) {
+                      await power(currentDevice.device_id);
+                    } else {
+                      await togglePlayPause(currentDevice.device_id);
+                    }
+                  }
+                : undefined
+            }
           />
 
           <VolumeSlider

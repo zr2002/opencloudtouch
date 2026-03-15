@@ -1,5 +1,6 @@
 /* Now Playing - Device Card Display */
 .now-playing {
+  position: relative;
   background: linear-gradient(135deg, var(--color-bg-card) 0%, rgba(0, 102, 204, 0.1) 100%);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-xl);
@@ -109,4 +110,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Source mode badge (Bluetooth / Radio) */
+.np-source-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+}
+
+.np-source-badge.bluetooth {
+  color: #3b82f6;
+}
+
+.np-source-badge.radio {
+  color: #f59e0b;
 }

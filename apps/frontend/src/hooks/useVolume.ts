@@ -54,7 +54,7 @@ export function useVolume(deviceId: string | undefined): UseVolumeResult {
     return () => clearInterval(interval);
   }, [deviceId, fetchVolume]);
 
-  // Debounced volume setter
+  // Debounced volume setter — auto-unmutes when muted
   const setDeviceVolume = useCallback(
     (level: number) => {
       if (!deviceId) return;
@@ -66,7 +66,14 @@ export function useVolume(deviceId: string | undefined): UseVolumeResult {
         try {
           const vol = await setVolumeApi(deviceId, level);
           setVolume(vol.actual);
-          setMuted(vol.muted);
+          if (vol.muted) {
+            // Auto-unmute when slider is moved while muted
+            const unmuteVol = await setMuteApi(deviceId, false);
+            setMuted(unmuteVol.muted);
+            setVolume(unmuteVol.actual);
+          } else {
+            setMuted(vol.muted);
+          }
         } catch (err) {
           console.error("[useVolume] Failed to set volume:", err);
         } finally {

@@ -71,13 +71,26 @@ describe("VolumeSlider Component", () => {
       expect(mockOnMuteToggle).toHaveBeenCalledTimes(1);
     });
 
-    it("should disable slider when muted", () => {
+    it("should keep slider enabled when muted with visual distinction", () => {
       render(
         <VolumeSlider volume={50} onVolumeChange={vi.fn()} muted={true} onMuteToggle={vi.fn()} />
       );
 
       const slider = screen.getByRole("slider");
-      expect(slider).toBeDisabled();
+      expect(slider).not.toBeDisabled();
+      expect(slider).toHaveClass("muted");
+    });
+
+    it("should still fire onVolumeChange when muted and slider is moved", () => {
+      const mockChange = vi.fn();
+      render(
+        <VolumeSlider volume={50} onVolumeChange={mockChange} muted={true} onMuteToggle={vi.fn()} />
+      );
+
+      const slider = screen.getByRole("slider");
+      fireEvent.change(slider, { target: { value: "70" } });
+
+      expect(mockChange).toHaveBeenCalledWith(70);
     });
 
     it("should show unmute label when muted", () => {
