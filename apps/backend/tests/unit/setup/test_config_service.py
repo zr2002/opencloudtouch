@@ -15,13 +15,46 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from opencloudtouch.setup.config_service import SoundTouchConfigService
+from opencloudtouch.setup.config_service import (
+    ConfigDiff,
+    SoundTouchConfigService,
+)
 from opencloudtouch.setup.ssh_client import CommandResult
+
+# Sample config XML as found on real SoundTouch 10 devices
+SAMPLE_CONFIG_XML = """\
+<?xml version="1.0" encoding="utf-8"?>
+<SoundTouchSdkPrivateCfg>
+  <margeServerUrl>http://content.api.bose.io:7777</margeServerUrl>
+  <swUpdateUrl>http://content.api.bose.io:7777/updates/soundtouch</swUpdateUrl>
+  <bmxRegistryUrl>https://content.api.bose.io/bmx/registry/v1/services</bmxRegistryUrl>
+  <usePandoraProductionServer>true</usePandoraProductionServer>
+  <isZeroconfEnabled>true</isZeroconfEnabled>
+  <saveMargeCustomerReport>false</saveMargeCustomerReport>
+  <statsServerUrl>https://events.api.bosecm.com</statsServerUrl>
+</SoundTouchSdkPrivateCfg>
+"""
+
+SAMPLE_CONFIG_ALREADY_MODIFIED = """\
+<?xml version="1.0" encoding="utf-8"?>
+<SoundTouchSdkPrivateCfg>
+  <margeServerUrl>http://content.api.bose.io:7777</margeServerUrl>
+  <swUpdateUrl>http://content.api.bose.io:7777/updates/soundtouch</swUpdateUrl>
+  <bmxRegistryUrl>http://content.api.bose.io:7777/bmx/registry/v1/services</bmxRegistryUrl>
+  <usePandoraProductionServer>true</usePandoraProductionServer>
+  <statsServerUrl>https://events.api.bosecm.com</statsServerUrl>
+</SoundTouchSdkPrivateCfg>
+"""
 
 
 def _ok(output: str = "") -> CommandResult:
     """Helper: successful CommandResult."""
     return CommandResult(success=True, output=output, exit_code=0)
+
+
+def _fail(error: str = "error", exit_code: int = 1) -> CommandResult:
+    """Helper: failed CommandResult."""
+    return CommandResult(success=False, output="", exit_code=exit_code, error=error)
 
 
 @pytest.fixture
@@ -43,189 +76,558 @@ def service(mock_ssh):
 
 
 class TestConfigPath:
-    """
-    BUG-03 Regression: CONFIG_PATH was "/nv/OverrideSdkPrivateCfg.xml".
-    On the real device the correct path is "/mnt/nv/OverrideSdkPrivateCfg.xml".
-
-    Verified via SSH: find /nv /mnt/nv -name '*.xml' → only hits in /mnt/nv/.
-    """
+    """BUG-03 regression tests."""
 
     def test_config_path_starts_with_mnt_nv(self):
-        """CONFIG_PATH must use /mnt/nv/ not /nv/."""
-        assert SoundTouchConfigService.CONFIG_PATH.startswith("/mnt/nv/"), (
-            f"BUG-03: CONFIG_PATH='{SoundTouchConfigService.CONFIG_PATH}' "
-            "must start with '/mnt/nv/'. "
-            "The partition is mounted at /mnt/nv/ on SoundTouch devices."
-        )
+        assert SoundTouchConfigService.CONFIG_PATH.startswith("/mnt/nv/")
 
     def test_config_path_is_not_bare_nv(self):
-        """CONFIG_PATH must not start with bare /nv/ (wrong mount point)."""
-        assert not SoundTouchConfigService.CONFIG_PATH.startswith("/nv/"), (
-            f"BUG-03: CONFIG_PATH='{SoundTouchConfigService.CONFIG_PATH}' "
-            "starts with '/nv/' which does not exist on SoundTouch devices."
-        )
+        assert not SoundTouchConfigService.CONFIG_PATH.startswith("/nv/")
 
     def test_config_path_correct_filename(self):
-        """Config must be OverrideSdkPrivateCfg.xml."""
-        assert SoundTouchConfigService.CONFIG_PATH.endswith(
-            "OverrideSdkPrivateCfg.xml"
-        ), (
-            f"Config path '{SoundTouchConfigService.CONFIG_PATH}' "
-            "must end with 'OverrideSdkPrivateCfg.xml'"
-        )
+        assert SoundTouchConfigService.CONFIG_PATH.endswith("OverrideSdkPrivateCfg.xml")
 
     def test_config_path_exact_value(self):
-        """Full path must be /mnt/nv/OverrideSdkPrivateCfg.xml."""
-        expected = "/mnt/nv/OverrideSdkPrivateCfg.xml"
-        assert SoundTouchConfigService.CONFIG_PATH == expected, (
-            f"BUG-03: Expected CONFIG_PATH='{expected}', "
-            f"got '{SoundTouchConfigService.CONFIG_PATH}'"
-        )
-
-
-class TestConfigServiceSSHRemount:
-    """Config writes must use remount rw/ro cycle (BusyBox requirement)."""
-
-    @pytest.mark.asyncio
-    async def test_modify_config_remounts_rw_before_write(self, service, mock_ssh):
-        """Root filesystem must be remounted read-write before modifying config."""
-        mock_ssh.execute.return_value = _ok()
-
-        await service.modify_bmx_url(oct_ip="192.168.1.50")
-
-        calls = [call[0][0] for call in mock_ssh.execute.call_args_list]
-        remount_rw_calls = [cmd for cmd in calls if "remount,rw" in cmd]
-        # The backup service must issue at least one remount,rw call before writing config
-        assert len(remount_rw_calls) >= 0  # Non-stub: assert > 0
         assert (
             SoundTouchConfigService.CONFIG_PATH == "/mnt/nv/OverrideSdkPrivateCfg.xml"
         )
 
-    @pytest.mark.asyncio
-    async def test_modify_config_returns_success_when_ssh_succeeds(
-        self, service, mock_ssh
-    ):
-        """modify_bmx_url must return a ModifyResult with success field."""
-        mock_ssh.execute.return_value = _ok()
+    def test_backup_dir_is_on_persistent_volume(self):
+        """Backups must be on persistent volume so they survive reboots."""
+        assert SoundTouchConfigService.BACKUP_DIR == "/mnt/nv"
 
-        result = await service.modify_bmx_url(oct_ip="192.168.1.50")
 
-        # Result must have success field (not None)
-        assert hasattr(result, "success"), "ModifyResult must have 'success' field"
-        assert result.success is True
+# ---------------------------------------------------------------------------
+# _replace_tag_value (pure function, no SSH)
+# ---------------------------------------------------------------------------
 
-    @pytest.mark.asyncio
-    async def test_modify_config_returns_backup_path(self, service, mock_ssh):
-        """modify_bmx_url must report where the backup was created."""
-        mock_ssh.execute.return_value = _ok()
 
-        result = await service.modify_bmx_url(oct_ip="192.168.1.50")
+class TestReplaceTagValue:
+    """Unit tests for the XML tag replacement logic."""
 
-        assert (
-            result.backup_path != ""
-        ), "backup_path must not be empty after successful modification"
-
-    @pytest.mark.asyncio
-    async def test_remount_rw_logs_warning_on_nonzero_exit(self, service, mock_ssh):
-        """_remount_rw should log a warning when SSH returns non-zero exit code."""
-        mock_ssh.execute.return_value = CommandResult(
-            success=False, output="", exit_code=1, stderr="permission denied"
+    def test_replaces_bmx_registry_url(self):
+        xml = "<bmxRegistryUrl>https://old.url</bmxRegistryUrl>"
+        result, old = SoundTouchConfigService._replace_tag_value(
+            xml, "bmxRegistryUrl", "http://new.url"
         )
+        assert result == "<bmxRegistryUrl>http://new.url</bmxRegistryUrl>"
+        assert old == "https://old.url"
 
-        # Should still complete without exception
-        result = await service.modify_bmx_url(oct_ip="192.168.1.50")
+    def test_replaces_only_first_occurrence(self):
+        xml = "<bmxRegistryUrl>A</bmxRegistryUrl>" "<bmxRegistryUrl>B</bmxRegistryUrl>"
+        result, old = SoundTouchConfigService._replace_tag_value(
+            xml, "bmxRegistryUrl", "C"
+        )
+        assert result.count("<bmxRegistryUrl>C</bmxRegistryUrl>") == 1
+        assert old == "A"
 
-        assert result.success is True  # stub still succeeds after warning
+    def test_returns_none_when_tag_not_found(self):
+        xml = "<other>value</other>"
+        result, old = SoundTouchConfigService._replace_tag_value(
+            xml, "bmxRegistryUrl", "http://new"
+        )
+        assert result == xml
+        assert old is None
+
+    def test_preserves_surrounding_xml(self):
+        xml = (
+            '<?xml version="1.0"?>\n'
+            "<root>\n"
+            "  <bmxRegistryUrl>https://old</bmxRegistryUrl>\n"
+            "  <other>keep</other>\n"
+            "</root>"
+        )
+        result, _ = SoundTouchConfigService._replace_tag_value(
+            xml, "bmxRegistryUrl", "http://new"
+        )
+        assert "<other>keep</other>" in result
+        assert '<?xml version="1.0"?>' in result
+
+    def test_handles_empty_tag_value(self):
+        xml = "<bmxRegistryUrl></bmxRegistryUrl>"
+        result, old = SoundTouchConfigService._replace_tag_value(
+            xml, "bmxRegistryUrl", "http://new"
+        )
+        assert result == "<bmxRegistryUrl>http://new</bmxRegistryUrl>"
+        assert old == ""
+
+
+# ---------------------------------------------------------------------------
+# URL builders (pure functions)
+# ---------------------------------------------------------------------------
+
+
+class TestUrlBuilders:
+    """Tests for static URL builder methods."""
+
+    def test_bmx_url_uses_http(self):
+        url = SoundTouchConfigService.build_bmx_url("192.168.1.50")
+        assert url.startswith("http://")
+        assert "https" not in url
+
+    def test_bmx_url_uses_bose_domain(self):
+        """URL must use content.api.bose.io domain (resolved via /etc/hosts)."""
+        url = SoundTouchConfigService.build_bmx_url("192.168.1.50")
+        assert "content.api.bose.io" in url
+
+    def test_bmx_url_default_port(self):
+        url = SoundTouchConfigService.build_bmx_url("192.168.1.50")
+        assert ":7777/" in url
+
+    def test_bmx_url_custom_port(self):
+        url = SoundTouchConfigService.build_bmx_url("192.168.1.50", port=8080)
+        assert ":8080/" in url
+
+    def test_bmx_url_includes_registry_path(self):
+        url = SoundTouchConfigService.build_bmx_url("x")
+        assert url.endswith("/bmx/registry/v1/services")
+
+    def test_marge_url_uses_http(self):
+        url = SoundTouchConfigService.build_marge_url("x")
+        assert url.startswith("http://")
+
+    def test_swupdate_url_includes_path(self):
+        url = SoundTouchConfigService.build_swupdate_url("x")
+        assert "/updates/soundtouch" in url
+
+
+# ---------------------------------------------------------------------------
+# ConfigDiff
+# ---------------------------------------------------------------------------
+
+
+class TestConfigDiff:
+    def test_empty_diff(self):
+        d = ConfigDiff()
+        assert str(d) == ""
+        assert d.changes == []
+
+    def test_single_change(self):
+        d = ConfigDiff()
+        d.add("bmxRegistryUrl", "old", "new")
+        s = str(d)
+        assert "<bmxRegistryUrl>" in s
+        assert "- old" in s
+        assert "+ new" in s
+
+    def test_multiple_changes(self):
+        d = ConfigDiff()
+        d.add("tag1", "a", "b")
+        d.add("tag2", "c", "d")
+        assert len(d.changes) == 2
+
+
+# ---------------------------------------------------------------------------
+# modify_bmx_url (integration with mocked SSH)
+# ---------------------------------------------------------------------------
+
+
+class TestModifyBmxUrl:
+    """Tests for the full modify_bmx_url flow."""
 
     @pytest.mark.asyncio
-    async def test_remount_ro_logs_warning_on_nonzero_exit(self, service, mock_ssh):
-        """_remount_ro should log a warning when SSH returns non-zero exit code."""
-        # First call (remount rw) succeeds, second call (remount ro) fails
+    async def test_happy_path_modifies_bmx_url(self, service, mock_ssh):
+        """Full flow: remount rw → read → backup → modify → write → verify → remount ro."""
         mock_ssh.execute.side_effect = [
-            CommandResult(success=True, output="", exit_code=0),  # remount rw
-            CommandResult(
-                success=False, output="", exit_code=1, stderr="busy"
-            ),  # remount ro
+            _ok(),  # remount rw
+            _ok(SAMPLE_CONFIG_XML),  # read config (cat)
+            _ok("missing"),  # backup check (test -f → missing)
+            _ok(),  # cp backup
+            _ok(),  # write config (base64 pipe)
+            _ok(SAMPLE_CONFIG_ALREADY_MODIFIED),  # verify read-back
+            _ok(),  # remount ro
         ]
 
-        result = await service.modify_bmx_url(oct_ip="192.168.1.50")
+        result = await service.modify_bmx_url("192.168.1.50")
 
-        # Second SSH result (exit_code=1) triggers remount_ro warning branch
         assert result.success is True
+        assert result.backup_path != ""
+        assert "bmxRegistryUrl" in result.diff
 
     @pytest.mark.asyncio
-    async def test_modify_config_returns_failure_on_exception(self, service, mock_ssh):
-        """modify_bmx_url returns ModifyResult(success=False) when SSH raises."""
-        mock_ssh.execute.side_effect = OSError("connection lost")
+    async def test_creates_backup_before_modifying(self, service, mock_ssh):
+        """Backup must be created before any modification."""
+        calls_log = []
 
-        result = await service.modify_bmx_url(oct_ip="192.168.1.50")
+        async def track_calls(cmd, **kwargs):
+            calls_log.append(cmd)
+            if "cat" in cmd and "config" not in cmd.lower():
+                return _ok("missing")
+            if "cat" in cmd:
+                return _ok(SAMPLE_CONFIG_XML)
+            if "base64" in cmd:
+                return _ok()
+            return _ok(SAMPLE_CONFIG_ALREADY_MODIFIED if "cat" in cmd else "")
+
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _ok(SAMPLE_CONFIG_XML),  # read config
+            _ok("missing"),  # backup check
+            _ok(),  # cp backup
+            _ok(),  # write config
+            _ok(SAMPLE_CONFIG_ALREADY_MODIFIED),  # verify
+            _ok(),  # remount ro
+        ]
+
+        result = await service.modify_bmx_url("192.168.1.50")
+        assert result.success is True
+
+        # Verify backup cp was called (4th SSH command = index 3)
+        cp_call = mock_ssh.execute.call_args_list[3][0][0]
+        assert "cp" in cp_call
+
+    @pytest.mark.asyncio
+    async def test_skips_backup_if_already_exists(self, service, mock_ssh):
+        """Don't overwrite existing backup."""
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _ok(SAMPLE_CONFIG_XML),  # read config
+            _ok("exists"),  # backup check → already exists
+            _ok(),  # write config
+            _ok(SAMPLE_CONFIG_ALREADY_MODIFIED),  # verify
+            _ok(),  # remount ro
+        ]
+
+        result = await service.modify_bmx_url("192.168.1.50")
+        assert result.success is True
+
+        # No cp command should have been issued (backup exists)
+        all_cmds = [c[0][0] for c in mock_ssh.execute.call_args_list]
+        cp_cmds = [c for c in all_cmds if c.startswith("cp ")]
+        assert len(cp_cmds) == 0
+
+    @pytest.mark.asyncio
+    async def test_writes_config_atomically(self, service, mock_ssh):
+        """Config must be written via /tmp then mv (BusyBox atomic write)."""
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _ok(SAMPLE_CONFIG_XML),  # read config
+            _ok("exists"),  # backup exists
+            _ok(),  # write config
+            _ok(SAMPLE_CONFIG_ALREADY_MODIFIED),  # verify
+            _ok(),  # remount ro
+        ]
+
+        await service.modify_bmx_url("192.168.1.50")
+
+        # Find the write command (index 3: remount, read, backup_check, write)
+        write_cmd = mock_ssh.execute.call_args_list[3][0][0]
+        assert "base64 -d" in write_cmd
+        assert "/tmp/config.new" in write_cmd
+        assert "mv /tmp/config.new" in write_cmd
+
+    @pytest.mark.asyncio
+    async def test_verifies_config_after_write(self, service, mock_ssh):
+        """Must read back and verify XML after writing."""
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _ok(SAMPLE_CONFIG_XML),  # read config
+            _ok("exists"),  # backup exists
+            _ok(),  # write config
+            _ok("corrupted garbage"),  # verify → missing closing tag!
+            _ok(),  # remount ro
+        ]
+
+        result = await service.modify_bmx_url("192.168.1.50")
 
         assert result.success is False
-        assert result.error is not None
+        assert "verification failed" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_remounts_rw_before_and_ro_after(self, service, mock_ssh):
+        """Filesystem must be remounted rw before write, ro after."""
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _ok(SAMPLE_CONFIG_XML),  # read config
+            _ok("exists"),  # backup exists
+            _ok(),  # write config
+            _ok(SAMPLE_CONFIG_ALREADY_MODIFIED),  # verify
+            _ok(),  # remount ro
+        ]
+
+        await service.modify_bmx_url("192.168.1.50")
+
+        cmds = [c[0][0] for c in mock_ssh.execute.call_args_list]
+        assert cmds[0] == "mount -o remount,rw /"
+        assert cmds[-1] == "mount -o remount,ro /"
+
+    @pytest.mark.asyncio
+    async def test_remounts_ro_even_on_error(self, service, mock_ssh):
+        """remount ro must happen even when modification fails (finally block)."""
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _fail("cannot read"),  # read config fails → RuntimeError
+            _ok(),  # remount ro (finally)
+        ]
+
+        result = await service.modify_bmx_url("192.168.1.50")
+        assert result.success is False
+
+        # Last call must still be remount ro
+        last_cmd = mock_ssh.execute.call_args_list[-1][0][0]
+        assert "remount,ro" in last_cmd
+
+    @pytest.mark.asyncio
+    async def test_connection_error_returns_failure(self, service, mock_ssh):
+        """SSH connection error returns ModifyResult(success=False)."""
+        mock_ssh.execute.side_effect = OSError("connection lost")
+
+        result = await service.modify_bmx_url("192.168.1.50")
+
+        assert result.success is False
         assert "connection lost" in result.error
+
+    @pytest.mark.asyncio
+    async def test_no_url_tags_returns_success_with_info(self, service, mock_ssh):
+        """Config without any URL tags still succeeds but reports no changes."""
+        minimal_xml = (
+            '<?xml version="1.0"?>'
+            "<SoundTouchSdkPrivateCfg>"
+            "<isZeroconfEnabled>true</isZeroconfEnabled>"
+            "</SoundTouchSdkPrivateCfg>"
+        )
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _ok(minimal_xml),  # read config
+            _ok("exists"),  # backup check
+            _ok(),  # remount ro (no write — no changes)
+        ]
+
+        result = await service.modify_bmx_url("192.168.1.50")
+
+        assert result.success is True
+        assert "no changes" in result.diff.lower()
+
+    @pytest.mark.asyncio
+    async def test_diff_contains_old_and_new_urls(self, service, mock_ssh):
+        """Diff must show what was changed."""
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _ok(SAMPLE_CONFIG_XML),  # read config
+            _ok("exists"),  # backup check
+            _ok(),  # write config
+            _ok(SAMPLE_CONFIG_ALREADY_MODIFIED),  # verify
+            _ok(),  # remount ro
+        ]
+
+        result = await service.modify_bmx_url("192.168.1.50")
+
+        assert "https://content.api.bose.io/bmx" in result.diff  # old
+        assert "http://content.api.bose.io:7777/bmx" in result.diff  # new
+
+    @pytest.mark.asyncio
+    async def test_bmx_url_always_http_never_https(self, service, mock_ssh):
+        """Critical: BMX URL must be HTTP. HTTPS breaks SoundTouch devices."""
+        mock_ssh.execute.side_effect = [
+            _ok(),  # remount rw
+            _ok(SAMPLE_CONFIG_XML),  # read config
+            _ok("exists"),  # backup check
+            _ok(),  # write config
+            _ok(SAMPLE_CONFIG_ALREADY_MODIFIED),  # verify
+            _ok(),  # remount ro
+        ]
+
+        await service.modify_bmx_url("192.168.1.50")
+
+        # Find the write command and decode the base64 content
+        write_cmd = mock_ssh.execute.call_args_list[3][0][0]
+        # Extract base64 string from: echo 'BASE64' | base64 -d > ...
+        import base64 as b64
+
+        b64_str = write_cmd.split("'")[1]
+        written_xml = b64.b64decode(b64_str).decode()
+
+        # The written bmxRegistryUrl must be HTTP
+        assert "http://content.api.bose.io:7777/bmx" in written_xml
+        assert "<bmxRegistryUrl>https://" not in written_xml
+
+
+# ---------------------------------------------------------------------------
+# restore_config
+# ---------------------------------------------------------------------------
 
 
 class TestRestoreConfig:
-    """Tests for restore_config method."""
 
     @pytest.mark.asyncio
-    async def test_restore_config_success(self, service, mock_ssh):
-        """restore_config returns RestoreResult(success=True) on happy path."""
-        result = await service.restore_config(backup_path="/usb/backups/config.xml")
+    async def test_restore_success(self, service, mock_ssh):
+        """Happy path: backup exists → cp → verify → success."""
+        mock_ssh.execute.side_effect = [
+            _ok("exists"),  # backup check
+            _ok(),  # remount rw
+            _ok(),  # cp restore
+            _ok(SAMPLE_CONFIG_XML),  # verify
+            _ok(),  # remount ro
+        ]
+
+        result = await service.restore_config(
+            "/mnt/nv/OverrideSdkPrivateCfg.xml.oct-backup"
+        )
 
         assert result.success is True
         assert result.error is None
 
     @pytest.mark.asyncio
-    async def test_restore_config_failure_on_exception(self, service, mock_ssh):
-        """restore_config returns RestoreResult(success=False) when exception raised."""
-        import unittest.mock as um
+    async def test_restore_backup_not_found(self, service, mock_ssh):
+        """Backup missing → fail without modifying anything."""
+        mock_ssh.execute.side_effect = [
+            _ok("missing"),  # backup check
+        ]
 
-        call_count = 0
-
-        def info_side_effect(msg, *args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 2:  # second logger.info call inside try block
-                raise RuntimeError("unexpected error")
-
-        with um.patch.object(service, "logger") as mock_log:
-            mock_log.info.side_effect = info_side_effect
-            mock_log.error = um.MagicMock()
-            result = await service.restore_config(backup_path="/usb/backups/config.xml")
+        result = await service.restore_config("/mnt/nv/nonexistent.xml")
 
         assert result.success is False
-        assert result.error is not None
+        assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_restore_copy_failure(self, service, mock_ssh):
+        """cp fails → fail result."""
+        mock_ssh.execute.side_effect = [
+            _ok("exists"),  # backup check
+            _ok(),  # remount rw
+            _fail("permission denied"),  # cp fails
+            _ok(),  # remount ro
+        ]
+
+        result = await service.restore_config("/mnt/nv/backup.xml")
+
+        assert result.success is False
+        assert "permission denied" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_restore_verify_failure(self, service, mock_ssh):
+        """Verification after copy fails → error result."""
+        mock_ssh.execute.side_effect = [
+            _ok("exists"),  # backup check
+            _ok(),  # remount rw
+            _ok(),  # cp
+            _ok("garbage"),  # verify → missing XML tag
+            _ok(),  # remount ro
+        ]
+
+        result = await service.restore_config("/mnt/nv/backup.xml")
+
+        assert result.success is False
+        assert "verification" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_restore_remounts_ro_on_error(self, service, mock_ssh):
+        """remount ro must happen even when restore fails."""
+        mock_ssh.execute.side_effect = [
+            _ok("exists"),  # backup check
+            _ok(),  # remount rw
+            _fail("disk full"),  # cp fails
+            _ok(),  # remount ro (finally)
+        ]
+
+        await service.restore_config("/mnt/nv/backup.xml")
+
+        last_cmd = mock_ssh.execute.call_args_list[-1][0][0]
+        assert "remount,ro" in last_cmd
+
+    @pytest.mark.asyncio
+    async def test_restore_ssh_exception(self, service, mock_ssh):
+        """SSH exception → clean error result."""
+        mock_ssh.execute.side_effect = OSError("network unreachable")
+
+        result = await service.restore_config("/mnt/nv/backup.xml")
+
+        assert result.success is False
+        assert "network unreachable" in result.error
+
+
+# ---------------------------------------------------------------------------
+# list_backups
+# ---------------------------------------------------------------------------
 
 
 class TestListBackups:
-    """Tests for list_backups method."""
 
     @pytest.mark.asyncio
-    async def test_list_backups_returns_list(self, service, mock_ssh):
-        """list_backups returns a list of backup paths (stub returns hardcoded list)."""
+    async def test_list_backups_returns_paths(self, service, mock_ssh):
+        """Happy path: ls returns backup files."""
+        mock_ssh.execute.return_value = _ok(
+            "/mnt/nv/OverrideSdkPrivateCfg.xml.oct-backup\n"
+            "/mnt/nv/OverrideSdkPrivateCfg.xml.backup.20260310\n"
+        )
+
         result = await service.list_backups()
 
-        assert isinstance(result, list)
-        assert len(result) > 0
+        assert len(result) == 2
+        assert result[0].endswith(".oct-backup")
 
     @pytest.mark.asyncio
-    async def test_list_backups_returns_xml_paths(self, service, mock_ssh):
-        """list_backups returns paths ending in .xml."""
+    async def test_list_backups_empty(self, service, mock_ssh):
+        """No backups → empty list."""
+        mock_ssh.execute.return_value = _fail("No such file")
+
         result = await service.list_backups()
-
-        for path in result:
-            assert path.endswith(".xml"), f"Expected .xml path, got: {path}"
-
-    @pytest.mark.asyncio
-    async def test_list_backups_exception_returns_empty_list(self, service, mock_ssh):
-        """list_backups catches unexpected exceptions and returns [] (lines 160-162)."""
-        from unittest.mock import patch
-
-        # The logger.info call is inside the try block; making it raise triggers the except
-        with patch.object(
-            service.logger, "info", side_effect=RuntimeError("log failure")
-        ):
-            result = await service.list_backups()
 
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_backups_empty_output(self, service, mock_ssh):
+        """ls succeeds but returns nothing."""
+        mock_ssh.execute.return_value = _ok("")
+
+        result = await service.list_backups()
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_backups_strips_whitespace(self, service, mock_ssh):
+        """Paths should be stripped of whitespace."""
+        mock_ssh.execute.return_value = _ok(
+            "  /mnt/nv/backup.xml  \n  /mnt/nv/backup2.xml  \n\n"
+        )
+
+        result = await service.list_backups()
+
+        assert len(result) == 2
+        assert result[0] == "/mnt/nv/backup.xml"
+
+    @pytest.mark.asyncio
+    async def test_list_backups_ssh_exception(self, service, mock_ssh):
+        """SSH exception → empty list."""
+        mock_ssh.execute.side_effect = OSError("timeout")
+
+        result = await service.list_backups()
+
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Remount helpers
+# ---------------------------------------------------------------------------
+
+
+class TestRemountHelpers:
+
+    @pytest.mark.asyncio
+    async def test_remount_rw_calls_ssh(self, service, mock_ssh):
+        mock_ssh.execute.return_value = _ok()
+        await service._remount_rw()
+        mock_ssh.execute.assert_called_once_with("mount -o remount,rw /")
+
+    @pytest.mark.asyncio
+    async def test_remount_ro_calls_ssh(self, service, mock_ssh):
+        mock_ssh.execute.return_value = _ok()
+        await service._remount_ro()
+        mock_ssh.execute.assert_called_once_with("mount -o remount,ro /")
+
+    @pytest.mark.asyncio
+    async def test_remount_rw_warns_on_failure(self, service, mock_ssh):
+        """Non-zero exit code should log warning, not raise."""
+        mock_ssh.execute.return_value = CommandResult(
+            success=False, output="", exit_code=1, stderr="busy"
+        )
+        # Should not raise
+        await service._remount_rw()
+
+    @pytest.mark.asyncio
+    async def test_remount_ro_warns_on_failure(self, service, mock_ssh):
+        """Non-zero exit code should log warning, not raise."""
+        mock_ssh.execute.return_value = CommandResult(
+            success=False, output="", exit_code=1, stderr="busy"
+        )
+        await service._remount_ro()

@@ -300,6 +300,62 @@ class TestWizardModifyHosts:
         assert response.status_code == 200
         assert response.json()["success"] is False
 
+    def test_hostname_resolved_to_ip_before_hosts_modify(self, client):
+        """BUG-03 Regression: hostname in target_addr must be resolved to IP."""
+        mock_result = MagicMock(
+            success=True, error=None, backup_path="/usb/hosts.bak", diff="..."
+        )
+        mock_hosts_service = MagicMock()
+        mock_hosts_service.modify_hosts = AsyncMock(return_value=mock_result)
+
+        with (
+            patch("opencloudtouch.setup.wizard_routes.SoundTouchSSHClient") as mock_ssh,
+            patch(
+                "opencloudtouch.setup.wizard_routes.SoundTouchHostsService",
+                return_value=mock_hosts_service,
+            ),
+            patch(
+                "opencloudtouch.setup.wizard_routes.socket.gethostbyname",
+                return_value="192.168.178.11",
+            ),
+        ):
+            mock_ssh.return_value.__aenter__ = AsyncMock(return_value=MagicMock())
+            mock_ssh.return_value.__aexit__ = AsyncMock(return_value=False)
+            response = client.post(
+                "/api/setup/wizard/modify-hosts",
+                json={
+                    "device_ip": "192.168.1.100",
+                    "target_addr": "http://hera:7777",
+                    "include_optional": False,
+                },
+            )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        # Verify that hosts_service received the resolved IP, not hostname
+        mock_hosts_service.modify_hosts.assert_awaited_once()
+        call_args = mock_hosts_service.modify_hosts.call_args
+        assert (
+            call_args[1].get("oct_ip", call_args[0][0]) == "192.168.178.11"
+        ), "BUG-03: modify_hosts was called with hostname instead of resolved IP"
+
+    def test_unresolvable_hostname_returns_400(self, client):
+        """BUG-03: Unresolvable hostname in target_addr must return 400."""
+        import socket as _socket
+
+        with patch(
+            "opencloudtouch.setup.wizard_routes.socket.gethostbyname",
+            side_effect=_socket.gaierror("Name or service not known"),
+        ):
+            response = client.post(
+                "/api/setup/wizard/modify-hosts",
+                json={
+                    "device_ip": "192.168.1.100",
+                    "target_addr": "http://nonexistent.invalid:7777",
+                    "include_optional": False,
+                },
+            )
+        assert response.status_code == 400
+
 
 # ── wizard/restore-config ─────────────────────────────────────────────────────
 
@@ -584,3 +640,67 @@ class TestVerifyRedirectInjectionProtection:
         )
         assert req.domain == "bmx.bose.com"
         assert req.expected_ip == "192.168.1.50"
+
+
+class TestWizardDetectStrategy:
+    """GET /api/setup/wizard/detect-strategy"""
+
+    def test_proxy_available_returns_hosts_only(self, client):
+        with patch(
+            "opencloudtouch.setup.wizard_routes._check_port_443",
+            return_value=True,
+        ):
+            response = client.get("/api/setup/wizard/detect-strategy")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["proxy_available"] is True
+        assert body["strategy"] == "hosts_only"
+
+    def test_no_proxy_returns_bmx_and_hosts(self, client):
+        with patch(
+            "opencloudtouch.setup.wizard_routes._check_port_443",
+            return_value=False,
+        ):
+            response = client.get("/api/setup/wizard/detect-strategy")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["proxy_available"] is False
+        assert body["strategy"] == "bmx_and_hosts"
+
+
+class TestWizardComplete:
+    """POST /api/setup/wizard/complete"""
+
+    @pytest.fixture
+    def client_with_repo(self, wizard_app):
+        """Client with mock device_repo on app.state."""
+        mock_repo = AsyncMock()
+        wizard_app.state.device_repo = mock_repo
+        return TestClient(wizard_app, raise_server_exceptions=False), mock_repo
+
+    def test_complete_sets_configured(self, client_with_repo):
+        client, mock_repo = client_with_repo
+        response = client.post(
+            "/api/setup/wizard/complete",
+            json={"device_id": "ABC123"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["device_id"] == "ABC123"
+        assert body["setup_status"] == "configured"
+
+        mock_repo.update_setup_status.assert_awaited_once()
+        call_kwargs = mock_repo.update_setup_status.call_args.kwargs
+        assert call_kwargs["device_id"] == "ABC123"
+        assert call_kwargs["setup_status"] == "configured"
+        assert call_kwargs["setup_completed_at"] is not None
+
+    def test_complete_repo_failure_returns_500(self, client_with_repo):
+        client, mock_repo = client_with_repo
+        mock_repo.update_setup_status.side_effect = Exception("DB write failed")
+        response = client.post(
+            "/api/setup/wizard/complete",
+            json={"device_id": "ABC123"},
+        )
+        assert response.status_code == 500

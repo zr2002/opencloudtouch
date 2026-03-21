@@ -3,7 +3,17 @@
 Covers the get_radio_adapter() factory and its OCT_MOCK_MODE env var branching.
 """
 
-from opencloudtouch.radio.adapter import get_radio_adapter
+import pytest
+
+from opencloudtouch.radio.adapter import get_radio_adapter, reset_radio_adapter
+
+
+@pytest.fixture(autouse=True)
+def _reset_singleton():
+    """Reset adapter singleton before each test."""
+    reset_radio_adapter()
+    yield
+    reset_radio_adapter()
 
 
 class TestGetRadioAdapterFactory:
@@ -46,3 +56,21 @@ class TestGetRadioAdapterFactory:
 
         adapter = get_radio_adapter()
         assert isinstance(adapter, RadioBrowserAdapter)
+
+    def test_singleton_returns_same_instance(self):
+        """Production mode returns same adapter instance (singleton)."""
+        import os
+
+        os.environ.pop("OCT_MOCK_MODE", None)
+
+        adapter1 = get_radio_adapter()
+        adapter2 = get_radio_adapter()
+        assert adapter1 is adapter2
+
+    def test_mock_mode_returns_new_instance_each_time(self, monkeypatch):
+        """Mock mode creates fresh instance each call (not singleton)."""
+        monkeypatch.setenv("OCT_MOCK_MODE", "true")
+
+        adapter1 = get_radio_adapter()
+        adapter2 = get_radio_adapter()
+        assert adapter1 is not adapter2

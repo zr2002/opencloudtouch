@@ -13,6 +13,31 @@ _No changes yet._
 
 ---
 
+## [1.1.0] - 2026-03-21
+
+### Added
+- **Multi-Room Zone Management** — Create, manage and dissolve speaker zones directly from the UI
+- **Setup Status Badge** — Gear icon on device cards shows live setup state (unknown/configured/outdated/failed/offline), persisted in DB
+- **Health-Check Background Task** — Periodic SSH verification to detect outdated or offline devices
+- **Dual-Strategy Setup Wizard** — Wizard auto-detects whether an HTTPS reverse proxy is available on port 443 and adapts the configuration strategy (hosts-only vs. BMX + hosts)
+- **Wizard Completion Endpoint** — `POST /api/setup/wizard/complete` persists `setup_status = configured` in DB when wizard finishes
+
+### Changed
+- **Volume Slider** — Replaced with DOM-direct RAF slider (A3) to eliminate drag lag; `onVolumeChange` fires only on pointer-up
+- **Preset UX** — Overhauled with play button, overwrite confirmation dialog, and station logos
+- **Setup Wizard** — Removed guided/manual mode selector; wizard starts directly in guided mode renamed to "Geführte Installation"
+- **UX Polish** — Improved volume slider, delete button, cloud badge, info box
+- Multi-room zone card layout improved; master device correctly shown in zone member list
+
+### Fixed
+- BUG-03: `/etc/hosts` entries now always use numeric IP (resolved via `socket.gethostbyname`); hostname like `hera` is no longer written to hosts file
+- Zone master injection re-applied; master device perspective preferred in `get_all_zones`
+- Device card drag disabled to prevent accidental swipe-navigation
+- Zone card blue border removed
+- Slider drag lag eliminated by removing inline styles during drag
+
+---
+
 ## [1.0.0] - 2026-03-09
 
 ### Added

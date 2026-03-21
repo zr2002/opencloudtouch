@@ -10,7 +10,7 @@ Orchestrates the device configuration process:
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Awaitable, Callable, Dict, Optional
 
 from opencloudtouch.core.config import get_config
@@ -40,9 +40,10 @@ class SetupService:
     Handles the full setup flow from SSH connection to BMX URL modification.
     """
 
-    def __init__(self):
+    def __init__(self, device_repo=None):
         self._active_setups: Dict[str, SetupProgress] = {}
         self._config = get_config()
+        self._device_repo = device_repo
 
     def get_setup_status(self, device_id: str) -> Optional[SetupProgress]:
         """Get current setup status for a device."""
@@ -136,8 +137,18 @@ class SetupService:
 
             await update_progress(SetupStep.COMPLETE, "Setup abgeschlossen!")
             progress.status = SetupStatus.CONFIGURED
-            progress.completed_at = datetime.utcnow()
+            progress.completed_at = datetime.now(UTC)
             logger.info(f"Device {device_id} setup completed successfully")
+
+            # Persist to device table
+            if self._device_repo:
+                await self._device_repo.update_setup_status(
+                    device_id=device_id,
+                    setup_status="configured",
+                    ssh_permanent=True,
+                    setup_completed_at=progress.completed_at,
+                )
+
             return progress
 
         except Exception as e:
@@ -145,6 +156,14 @@ class SetupService:
             progress.status = SetupStatus.FAILED
             progress.error = str(e)
             progress.message = "Setup fehlgeschlagen"
+
+            # Persist failure
+            if self._device_repo:
+                await self._device_repo.update_setup_status(
+                    device_id=device_id,
+                    setup_status="failed",
+                )
+
             return progress
         finally:
             if device_id in self._active_setups:
@@ -256,16 +275,22 @@ class SetupService:
         """
         Verify that a device is properly configured.
 
+        Supports two setup strategies:
+        - Strategy A (URL): BMX URL in config points directly to OCT server
+        - Strategy B (Hosts): /etc/hosts redirects Bose domains to OCT via
+          reverse proxy (identified by ``# OCT-START`` marker)
+
         Checks:
         - SSH is accessible
         - SSH is persistent
-        - BMX URL points to our server
+        - BMX URL points to our server OR hosts redirect is active
         """
         result = {
             "ip": ip,
             "ssh_accessible": False,
             "ssh_persistent": False,
             "bmx_configured": False,
+            "hosts_redirect": False,
             "bmx_url": None,
             "verified": False,
         }
@@ -294,7 +319,7 @@ class SetupService:
             )
             result["bmx_url"] = check.output.strip()
 
-            # Verify it points to our server
+            # Strategy A: BMX URL points directly to our server
             config = get_config()
             our_server = (
                 config.station_descriptor_base_url
@@ -302,14 +327,20 @@ class SetupService:
             )
             result["bmx_configured"] = our_server in check.output
 
+            # Strategy B: /etc/hosts redirects Bose domains to OCT
+            hosts_check = await client.execute(
+                "grep -c 'OCT-START' /etc/hosts 2>/dev/null || echo '0'"
+            )
+            result["hosts_redirect"] = hosts_check.output.strip() != "0"
+
             await client.close()
 
-            # Overall verification
+            # Either strategy counts as configured
             result["verified"] = all(
                 [
                     result["ssh_accessible"],
                     result["ssh_persistent"],
-                    result["bmx_configured"],
+                    result["bmx_configured"] or result["hosts_redirect"],
                 ]
             )
 
@@ -317,15 +348,3 @@ class SetupService:
             logger.error(f"Verification failed: {e}")
 
         return result
-
-
-# Singleton instance
-_setup_service: Optional[SetupService] = None
-
-
-def get_setup_service() -> SetupService:
-    """Get or create the setup service singleton."""
-    global _setup_service
-    if _setup_service is None:
-        _setup_service = SetupService()
-    return _setup_service

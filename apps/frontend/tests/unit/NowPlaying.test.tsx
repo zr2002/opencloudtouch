@@ -6,13 +6,13 @@
  * Focus: Functional tests for now playing display
  * - Show track, artist, station info
  * - Show album art or placeholder
- * - Show play/pause status
+ * - Play/Pause overlay on album art
  * - Handle missing data gracefully
  * - Empty state when nothing playing
  */
 
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import NowPlaying from "../../src/components/NowPlaying";
 
 describe("NowPlaying Component", () => {
@@ -74,38 +74,55 @@ describe("NowPlaying Component", () => {
         play_status: "PLAY_STATE",
       };
 
-      render(<NowPlaying nowPlaying={nowPlaying} />);
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
 
-      expect(screen.getByText("🎵")).toBeInTheDocument();
+      expect(container.querySelector(".np-art-placeholder svg")).toBeInTheDocument();
     });
   });
 
-  describe("Play Status Icons", () => {
-    it("should show play icon (▶) when playing", () => {
+  describe("Play/Pause Overlay", () => {
+    it("should show Pause button overlay when playing and onPlayPause provided", () => {
       const nowPlaying = {
         station: "Test Station",
         track: "Test Track",
         play_status: "PLAY_STATE",
       };
 
-      render(<NowPlaying nowPlaying={nowPlaying} />);
+      const { container } = render(
+        <NowPlaying nowPlaying={nowPlaying} onPlayPause={vi.fn()} />
+      );
 
-      expect(screen.getByText("▶")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+      expect(container.querySelector(".np-play-overlay")).toBeInTheDocument();
     });
 
-    it("should show pause icon (⏸) when paused", () => {
+    it("should show Play button overlay when paused and onPlayPause provided", () => {
       const nowPlaying = {
         station: "Test Station",
         track: "Test Track",
         play_status: "PAUSE_STATE",
       };
 
-      render(<NowPlaying nowPlaying={nowPlaying} />);
+      render(<NowPlaying nowPlaying={nowPlaying} onPlayPause={vi.fn()} />);
 
-      expect(screen.getByText("⏸")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
     });
 
-    it("should apply playing CSS class when status is PLAY_STATE", () => {
+    it("should call onPlayPause when overlay clicked", () => {
+      const mockPlayPause = vi.fn();
+      const nowPlaying = {
+        station: "Test Station",
+        track: "Test Track",
+        play_status: "PLAY_STATE",
+      };
+
+      render(<NowPlaying nowPlaying={nowPlaying} onPlayPause={mockPlayPause} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+      expect(mockPlayPause).toHaveBeenCalledTimes(1);
+    });
+
+    it("should not show overlay when onPlayPause not provided", () => {
       const nowPlaying = {
         station: "Test Station",
         track: "Test Track",
@@ -114,26 +131,12 @@ describe("NowPlaying Component", () => {
 
       const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
 
-      const statusIcon = container.querySelector(".status-icon");
-      expect(statusIcon).toHaveClass("playing");
-    });
-
-    it("should not apply playing CSS class when paused", () => {
-      const nowPlaying = {
-        station: "Test Station",
-        track: "Test Track",
-        play_status: "PAUSE_STATE",
-      };
-
-      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
-
-      const statusIcon = container.querySelector(".status-icon");
-      expect(statusIcon).not.toHaveClass("playing");
+      expect(container.querySelector(".np-play-overlay")).not.toBeInTheDocument();
     });
   });
 
   describe("Missing Data Handling", () => {
-    it('should show "Unknown Station" when station not provided', () => {
+    it('should show "Kein Sender" when station not provided', () => {
       const nowPlaying = {
         track: "Test Track",
         play_status: "PLAY_STATE",
@@ -141,18 +144,18 @@ describe("NowPlaying Component", () => {
 
       render(<NowPlaying nowPlaying={nowPlaying} />);
 
-      expect(screen.getByText("Unknown Station")).toBeInTheDocument();
+      expect(screen.getByText("Kein Sender")).toBeInTheDocument();
     });
 
-    it('should show "Unknown Track" when track not provided', () => {
+    it("should not show track element when track not provided", () => {
       const nowPlaying = {
         station: "Test Station",
         play_status: "PLAY_STATE",
       };
 
-      render(<NowPlaying nowPlaying={nowPlaying} />);
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
 
-      expect(screen.getByText("Unknown Track")).toBeInTheDocument();
+      expect(container.querySelector(".np-track")).not.toBeInTheDocument();
     });
 
     it("should not display artist element when artist not provided", () => {
@@ -164,7 +167,6 @@ describe("NowPlaying Component", () => {
 
       const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
 
-      // Artist div should not exist when artist is not provided
       const artistElement = container.querySelector(".np-artist");
       expect(artistElement).not.toBeInTheDocument();
     });
@@ -193,7 +195,9 @@ describe("NowPlaying Component", () => {
         play_status: "PLAY_STATE",
       };
 
-      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+      const { container } = render(
+        <NowPlaying nowPlaying={nowPlaying} onPlayPause={vi.fn()} />
+      );
 
       expect(screen.getByText("Classic Rock FM")).toBeInTheDocument();
       expect(screen.getByText("Bohemian Rhapsody")).toBeInTheDocument();
@@ -202,7 +206,7 @@ describe("NowPlaying Component", () => {
       const img = container.querySelector(".np-art img");
       expect(img).toHaveAttribute("src", "https://example.com/art.jpg");
 
-      expect(screen.getByText("▶")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
     });
 
     it("should handle minimal data with only track", () => {
@@ -211,12 +215,111 @@ describe("NowPlaying Component", () => {
         play_status: "PAUSE_STATE",
       };
 
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} onPlayPause={vi.fn()} />);
+
+      expect(screen.getByText("Kein Sender")).toBeInTheDocument();
+      expect(screen.getByText("Unknown Artist Song")).toBeInTheDocument();
+      expect(container.querySelector(".np-art-placeholder svg")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
+    });
+  });
+
+  describe("Source Badge", () => {
+    it("should show Bluetooth badge when source is BLUETOOTH", () => {
+      const nowPlaying = {
+        station: "My Phone",
+        source: "BLUETOOTH",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(container.querySelector(".np-source-badge.bluetooth")).toBeInTheDocument();
+    });
+
+    it("should show Radio badge when source is INTERNET_RADIO", () => {
+      const nowPlaying = {
+        station: "Radio FM",
+        source: "INTERNET_RADIO",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(container.querySelector(".np-source-badge.radio")).toBeInTheDocument();
+    });
+
+    it("should show Radio badge when source is TUNEIN", () => {
+      const nowPlaying = {
+        station: "TuneIn Station",
+        source: "TUNEIN",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(container.querySelector(".np-source-badge.radio")).toBeInTheDocument();
+    });
+
+    it("should not show badge when no source provided", () => {
+      const nowPlaying = {
+        station: "Some Station",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(container.querySelector(".np-source-badge")).not.toBeInTheDocument();
+    });
+
+    it("should render badge SVG at 16px size", () => {
+      const nowPlaying = {
+        station: "My Phone",
+        source: "BLUETOOTH",
+        play_status: "PLAY_STATE",
+      };
+
+      const { container } = render(<NowPlaying nowPlaying={nowPlaying} />);
+      const svg = container.querySelector(".np-source-badge svg");
+
+      expect(svg).toHaveAttribute("width", "16");
+      expect(svg).toHaveAttribute("height", "16");
+    });
+  });
+
+  describe("Bluetooth Source Display", () => {
+    it('should show "Kein Gerät verbunden" for BLUETOOTH source without station', () => {
+      const nowPlaying = {
+        source: "BLUETOOTH",
+        play_status: "PLAY_STATE",
+      };
+
       render(<NowPlaying nowPlaying={nowPlaying} />);
 
-      expect(screen.getByText("Unknown Station")).toBeInTheDocument();
-      expect(screen.getByText("Unknown Artist Song")).toBeInTheDocument();
-      expect(screen.getByText("🎵")).toBeInTheDocument();
-      expect(screen.getByText("⏸")).toBeInTheDocument();
+      expect(screen.getByText("Kein Gerät verbunden")).toBeInTheDocument();
+    });
+
+    it("should show device name for BLUETOOTH source with station", () => {
+      const nowPlaying = {
+        station: "iPhone von Max",
+        source: "BLUETOOTH",
+        play_status: "PLAY_STATE",
+      };
+
+      render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(screen.getByText("iPhone von Max")).toBeInTheDocument();
+    });
+
+    it('should show "Kein Sender" for non-BLUETOOTH source without station', () => {
+      const nowPlaying = {
+        source: "INTERNET_RADIO",
+        play_status: "PLAY_STATE",
+      };
+
+      render(<NowPlaying nowPlaying={nowPlaying} />);
+
+      expect(screen.getByText("Kein Sender")).toBeInTheDocument();
     });
   });
 });

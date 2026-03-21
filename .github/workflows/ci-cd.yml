@@ -16,7 +16,7 @@ on:
       ignore_scan_errors:
         description: 'Ignore container scan errors (registry access issues)'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 env:

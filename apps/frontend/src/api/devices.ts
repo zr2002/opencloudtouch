@@ -16,6 +16,9 @@ interface DeviceAPIResponse {
   firmware_version: string;
   schema_version?: string;
   last_seen: string;
+  setup_status: string;
+  ssh_permanent: boolean;
+  setup_completed_at: string | null;
 }
 
 // Frontend Device interface (matches DeviceSwiper.tsx)
@@ -25,6 +28,9 @@ export interface Device {
   model?: string;
   firmware?: string;
   ip?: string;
+  setup_status?: string;
+  ssh_permanent?: boolean;
+  setup_completed_at?: string | null;
   capabilities?: {
     airplay?: boolean;
   };
@@ -48,6 +54,9 @@ function mapDeviceFromAPI(apiDevice: DeviceAPIResponse): Device {
     model: apiDevice.model, // Backend already returns 'model'
     ip: apiDevice.ip, // Backend already returns 'ip'
     firmware: apiDevice.firmware_version,
+    setup_status: apiDevice.setup_status,
+    ssh_permanent: apiDevice.ssh_permanent,
+    setup_completed_at: apiDevice.setup_completed_at,
   };
 }
 
@@ -201,4 +210,36 @@ export async function getNowPlaying(deviceId: string): Promise<NowPlayingState> 
     throw new Error(`Failed to get now playing: ${response.statusText}`);
   }
   return response.json();
+}
+
+export async function togglePlayPause(deviceId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/devices/${deviceId}/key?key=PLAY_PAUSE&state=both`,
+    { method: "POST" }
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to toggle play/pause: ${response.statusText}`);
+  }
+}
+
+export async function sendKey(deviceId: string, key: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/devices/${deviceId}/key?key=${encodeURIComponent(key)}&state=both`,
+    { method: "POST" }
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to send key ${key}: ${response.statusText}`);
+  }
+}
+
+export async function nextTrack(deviceId: string): Promise<void> {
+  return sendKey(deviceId, "NEXT_TRACK");
+}
+
+export async function prevTrack(deviceId: string): Promise<void> {
+  return sendKey(deviceId, "PREV_TRACK");
+}
+
+export async function power(deviceId: string): Promise<void> {
+  return sendKey(deviceId, "POWER");
 }

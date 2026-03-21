@@ -81,17 +81,17 @@ vi.mock("../../src/components/VolumeSlider", () => ({
 }));
 
 vi.mock("../../src/components/PresetButton", () => ({
-  default: ({ number, preset, onAssign, onClear, onPlay }: { number: number; preset: { station_name: string } | null; onAssign: () => void; onClear: () => void; onPlay: () => void }) => (
+  default: ({ number, preset, onAssign, onPlay, isCurrentlyPlaying }: { number: number; preset: { station_name: string } | null; onAssign: () => void; onPlay: () => void; isCurrentlyPlaying?: boolean }) => (
     <div data-testid={`preset-${number}`}>
       <span>Preset {number}</span>
       {preset ? (
         <>
           <span data-testid={`preset-${number}-name`}>{preset.station_name}</span>
-          <button onClick={onPlay} data-testid={`preset-${number}-play`}>
-            Play
+          <button onClick={onAssign} data-testid={`preset-${number}-change`}>
+            Change
           </button>
-          <button onClick={onClear} data-testid={`preset-${number}-clear`}>
-            Clear
+          <button onClick={onPlay} data-testid={`preset-${number}-play`} disabled={isCurrentlyPlaying}>
+            Play
           </button>
         </>
       ) : (
@@ -104,7 +104,7 @@ vi.mock("../../src/components/PresetButton", () => ({
 }));
 
 vi.mock("../../src/components/RadioSearch", () => ({
-  default: ({ isOpen, onClose, onStationSelect }: { isOpen: boolean; onClose: () => void; onStationSelect: (station: { stationuuid: string; name: string; country: string; url: string; homepage: string; favicon: string }) => void }) => {
+  default: ({ isOpen, onClose, onStationSelect, onDelete, hasExistingPreset }: { isOpen: boolean; onClose: () => void; onStationSelect: (station: { stationuuid: string; name: string; country: string; url: string; homepage: string; favicon: string }) => void; onDelete?: () => void; hasExistingPreset?: boolean }) => {
     if (!isOpen) return null;
     return (
       <div data-testid="radio-search-modal">
@@ -126,9 +126,18 @@ vi.mock("../../src/components/RadioSearch", () => ({
         >
           Select Test Radio
         </button>
+        {hasExistingPreset && onDelete && (
+          <button onClick={onDelete} data-testid="search-delete-preset">
+            Delete Preset
+          </button>
+        )}
       </div>
     );
   },
+}));
+
+vi.mock("../../src/components/SetupBadge", () => ({
+  default: () => <span data-testid="setup-badge" />,
 }));
 
 describe("RadioPresets Page", () => {
@@ -320,68 +329,199 @@ describe("RadioPresets Page", () => {
     });
   });
 
-  describe("Preset Clearing", () => {
-    it("should clear assigned preset when clicking clear button", async () => {
+  describe("Preset Overwrite Flow", () => {
+    it("should show overwrite confirmation when assigning to occupied preset", async () => {
+      vi.mocked(presetsApi.getDevicePresets).mockResolvedValue([
+        {
+          id: 1,
+          device_id: "AABBCC123456",
+          preset_number: 4,
+          station_uuid: "uuid-4",
+          station_name: "Old Radio",
+          station_url: "http://old.com",
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z",
+        },
+      ]);
+
       await act(async () => {
         render(<RadioPresets devices={mockDevices} />);
       });
-
-      // Assign preset
-      fireEvent.click(screen.getByTestId("preset-4-assign"));
-      fireEvent.click(screen.getByTestId("select-station"));
 
       await waitFor(() => {
         expect(screen.getByTestId("preset-4-name")).toBeInTheDocument();
       });
 
-      // Click clear — opens ConfirmDialog
-      fireEvent.click(screen.getByTestId("preset-4-clear"));
+      // Click change on an occupied preset
+      fireEvent.click(screen.getByTestId("preset-4-change"));
 
-      // Confirm in dialog
+      // Select a new station
+      fireEvent.click(screen.getByTestId("select-station"));
+
+      // Should show overwrite confirmation
       await waitFor(() => {
         expect(screen.getByTestId("confirm-dialog-confirm")).toBeInTheDocument();
       });
-      fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
-
-      // Should show assign button again
-      await waitFor(() => {
-        expect(screen.getByTestId("preset-4-assign")).toBeInTheDocument();
-        expect(screen.queryByTestId("preset-4-name")).not.toBeInTheDocument();
-      });
     });
 
-    it("should maintain other presets when clearing one", async () => {
+    it("should overwrite preset when user confirms", async () => {
+      vi.mocked(presetsApi.getDevicePresets).mockResolvedValue([
+        {
+          id: 1,
+          device_id: "AABBCC123456",
+          preset_number: 4,
+          station_uuid: "uuid-4",
+          station_name: "Old Radio",
+          station_url: "http://old.com",
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z",
+        },
+      ]);
+
       await act(async () => {
         render(<RadioPresets devices={mockDevices} />);
       });
 
-      // Wait for the REFACT-120 auto-sync debounce (500 ms) to fire and settle,
-      // otherwise the background sync resets optimistically-saved presets mid-test.
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 600));
+      await waitFor(() => {
+        expect(screen.getByTestId("preset-4-name")).toBeInTheDocument();
       });
 
-      // Assign two presets
-      fireEvent.click(screen.getByTestId("preset-1-assign"));
+      // Click change → select new station → confirm overwrite
+      fireEvent.click(screen.getByTestId("preset-4-change"));
       fireEvent.click(screen.getByTestId("select-station"));
-      await waitFor(() => expect(screen.getByTestId("preset-1-name")).toBeInTheDocument());
 
-      fireEvent.click(screen.getByTestId("preset-2-assign"));
-      fireEvent.click(screen.getByTestId("select-station"));
-      await waitFor(() => expect(screen.getByTestId("preset-2-name")).toBeInTheDocument());
-
-      // Clear preset 1 — confirm in dialog
-      fireEvent.click(screen.getByTestId("preset-1-clear"));
       await waitFor(() => {
         expect(screen.getByTestId("confirm-dialog-confirm")).toBeInTheDocument();
       });
       fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
 
-      // Preset 1 should be cleared, preset 2 should remain
+      // Should call setPreset API
       await waitFor(() => {
-        expect(screen.getByTestId("preset-1-assign")).toBeInTheDocument();
-        expect(screen.getByTestId("preset-2-name")).toBeInTheDocument();
+        expect(presetsApi.setPreset).toHaveBeenCalledWith(
+          expect.objectContaining({
+            device_id: "AABBCC123456",
+            preset_number: 4,
+            station_name: "Test Radio",
+          })
+        );
       });
+    });
+
+    it("should not overwrite preset when user cancels", async () => {
+      vi.mocked(presetsApi.getDevicePresets).mockResolvedValue([
+        {
+          id: 1,
+          device_id: "AABBCC123456",
+          preset_number: 5,
+          station_uuid: "uuid-5",
+          station_name: "Radio Five",
+          station_url: "http://radio5.com",
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z",
+        },
+      ]);
+
+      await act(async () => {
+        render(<RadioPresets devices={mockDevices} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("preset-5-name")).toBeInTheDocument();
+      });
+
+      // Click change → select new station → cancel
+      fireEvent.click(screen.getByTestId("preset-5-change"));
+      fireEvent.click(screen.getByTestId("select-station"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("confirm-dialog-cancel")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+
+      // Should NOT call setPreset API
+      expect(presetsApi.setPreset).not.toHaveBeenCalled();
+
+      // Preset should still show old name
+      expect(screen.getByTestId("preset-5-name")).toHaveTextContent("Radio Five");
+    });
+  });
+
+  describe("Preset Deletion", () => {
+    it("should show delete button in search modal for occupied preset", async () => {
+      vi.mocked(presetsApi.getDevicePresets).mockResolvedValue([
+        {
+          id: 1,
+          device_id: "AABBCC123456",
+          preset_number: 3,
+          station_uuid: "uuid-3",
+          station_name: "Old Station",
+          station_url: "http://old.com",
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z",
+        },
+      ]);
+
+      await act(async () => {
+        render(<RadioPresets devices={mockDevices} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("preset-3-name")).toBeInTheDocument();
+      });
+
+      // Open search for occupied preset
+      fireEvent.click(screen.getByTestId("preset-3-change"));
+
+      // Delete button should be visible
+      expect(screen.getByTestId("search-delete-preset")).toBeInTheDocument();
+    });
+
+    it("should delete preset when delete button is clicked", async () => {
+      vi.mocked(presetsApi.getDevicePresets).mockResolvedValue([
+        {
+          id: 1,
+          device_id: "AABBCC123456",
+          preset_number: 2,
+          station_uuid: "uuid-2",
+          station_name: "Delete Me",
+          station_url: "http://delete.com",
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z",
+        },
+      ]);
+
+      await act(async () => {
+        render(<RadioPresets devices={mockDevices} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("preset-2-name")).toHaveTextContent("Delete Me");
+      });
+
+      // Open search → click delete
+      fireEvent.click(screen.getByTestId("preset-2-change"));
+      fireEvent.click(screen.getByTestId("search-delete-preset"));
+
+      await waitFor(() => {
+        expect(presetsApi.clearPreset).toHaveBeenCalledWith("AABBCC123456", 2);
+      });
+
+      // Modal should close and preset should be gone
+      await waitFor(() => {
+        expect(screen.queryByTestId("radio-search-modal")).not.toBeInTheDocument();
+      });
+    });
+
+    it("should not show delete button for empty preset", async () => {
+      await act(async () => {
+        render(<RadioPresets devices={mockDevices} />);
+      });
+
+      // Open search for empty preset
+      fireEvent.click(screen.getByTestId("preset-1-assign"));
+
+      // Delete button should NOT be visible
+      expect(screen.queryByTestId("search-delete-preset")).not.toBeInTheDocument();
     });
   });
 
@@ -520,8 +660,7 @@ describe("RadioPresets Page", () => {
       });
     });
 
-    it("should call clearPreset API when clearing preset", async () => {
-      // Setup preset first
+    it("should call setPreset API when overwriting existing preset", async () => {
       vi.mocked(presetsApi.getDevicePresets).mockResolvedValue([
         {
           id: 1,
@@ -543,20 +682,27 @@ describe("RadioPresets Page", () => {
         expect(screen.getByTestId("preset-4-name")).toBeInTheDocument();
       });
 
-      // Click clear — confirm in dialog
-      fireEvent.click(screen.getByTestId("preset-4-clear"));
+      // Click change → select → confirm overwrite
+      fireEvent.click(screen.getByTestId("preset-4-change"));
+      fireEvent.click(screen.getByTestId("select-station"));
+
       await waitFor(() => {
         expect(screen.getByTestId("confirm-dialog-confirm")).toBeInTheDocument();
       });
       fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
 
-      // Should call API
+      // Should call setPreset API
       await waitFor(() => {
-        expect(presetsApi.clearPreset).toHaveBeenCalledWith("AABBCC123456", 4);
+        expect(presetsApi.setPreset).toHaveBeenCalledWith(
+          expect.objectContaining({
+            device_id: "AABBCC123456",
+            preset_number: 4,
+          })
+        );
       });
     });
 
-    it("should not clear preset if user cancels confirmation", async () => {
+    it("should not overwrite preset if user cancels confirmation", async () => {
       // Setup preset first
       vi.mocked(presetsApi.getDevicePresets).mockResolvedValue([
         {
@@ -579,17 +725,17 @@ describe("RadioPresets Page", () => {
         expect(screen.getByTestId("preset-5-name")).toBeInTheDocument();
       });
 
-      // Try to clear preset — opens ConfirmDialog
-      fireEvent.click(screen.getByTestId("preset-5-clear"));
+      // Click change → select → cancel
+      fireEvent.click(screen.getByTestId("preset-5-change"));
+      fireEvent.click(screen.getByTestId("select-station"));
 
-      // Cancel in dialog
       await waitFor(() => {
         expect(screen.getByTestId("confirm-dialog-cancel")).toBeInTheDocument();
       });
       fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
 
-      // Should NOT call API
-      expect(presetsApi.clearPreset).not.toHaveBeenCalled();
+      // Should NOT call setPreset API
+      expect(presetsApi.setPreset).not.toHaveBeenCalled();
 
       // Preset should still be there
       expect(screen.getByTestId("preset-5-name")).toBeInTheDocument();
@@ -710,7 +856,7 @@ describe("RadioPresets Page", () => {
       });
     });
 
-    it("should display error when clearing preset fails", async () => {
+    it("should display error when saving preset fails during overwrite", async () => {
       vi.mocked(presetsApi.getDevicePresets).mockResolvedValue([
         {
           id: 1,
@@ -724,7 +870,7 @@ describe("RadioPresets Page", () => {
         },
       ]);
 
-      vi.mocked(presetsApi.clearPreset).mockRejectedValue(new Error("Failed to clear preset"));
+      vi.mocked(presetsApi.setPreset).mockRejectedValue(new Error("Failed to save preset"));
 
       await act(async () => {
         render(<RadioPresets devices={mockDevices} />);
@@ -734,8 +880,10 @@ describe("RadioPresets Page", () => {
         expect(screen.getByTestId("preset-1-name")).toBeInTheDocument();
       });
 
-      // Try to clear — confirm in dialog
-      fireEvent.click(screen.getByTestId("preset-1-clear"));
+      // Click change → select → confirm overwrite
+      fireEvent.click(screen.getByTestId("preset-1-change"));
+      fireEvent.click(screen.getByTestId("select-station"));
+
       await waitFor(() => {
         expect(screen.getByTestId("confirm-dialog-confirm")).toBeInTheDocument();
       });
@@ -743,7 +891,7 @@ describe("RadioPresets Page", () => {
 
       // Should display user-friendly error
       await waitFor(() => {
-        expect(screen.getByTestId("error-message")).toHaveTextContent("Preset konnte nicht gelöscht werden");
+        expect(screen.getByTestId("error-message")).toHaveTextContent("Preset konnte nicht gespeichert werden");
       });
     });
   });

@@ -12,6 +12,7 @@ import logging
 import re
 import shlex
 import socket
+import ssl
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict
 
@@ -24,6 +25,7 @@ from opencloudtouch.setup.api_models import (
     ConfigModifyRequest,
     ConfigModifyResponse,
     ConnectivityCheckRequest,
+    DetectStrategyResponse,
     HostsModifyRequest,
     HostsModifyResponse,
     ListBackupsRequest,
@@ -34,6 +36,8 @@ from opencloudtouch.setup.api_models import (
     RestoreResponse,
     VerifyRedirectRequest,
     VerifyRedirectResponse,
+    WizardCompleteRequest,
+    WizardCompleteResponse,
 )
 from opencloudtouch.setup.backup_service import SoundTouchBackupService
 from opencloudtouch.setup.config_service import SoundTouchConfigService
@@ -82,16 +86,70 @@ async def wizard_server_info(request: Request) -> Dict[str, Any]:
 
     Returns server URL that frontend can use as default.
     Detects host/port from incoming HTTP request headers.
+    Also resolves the hostname to an IP for /etc/hosts usage.
     """
     # Extract from actual HTTP request
     url = request.url
-    server_url = f"{url.scheme}://{url.hostname}:{url.port or 7777}"
+    hostname = url.hostname or "127.0.0.1"
+    server_url = f"{url.scheme}://{hostname}:{url.port or 7777}"
+
+    # Resolve hostname → IP for /etc/hosts (requires numeric IP)
+    try:
+        server_ip = socket.gethostbyname(hostname)
+    except socket.gaierror:
+        server_ip = hostname
 
     return {
         "server_url": server_url,
+        "server_ip": server_ip,
         "default_port": 7777,
         "supported_protocols": ["http", "https"],
     }
+
+
+@wizard_router.get("/wizard/detect-strategy", response_model=DetectStrategyResponse)
+async def wizard_detect_strategy(request: Request) -> DetectStrategyResponse:
+    """Detect whether an HTTPS reverse proxy is available on port 443.
+
+    If a reverse proxy (e.g. Nginx) terminates SSL on 443 and forwards
+    to OCT, then the device only needs ``/etc/hosts`` changes (Strategy B).
+    Otherwise, the BMX URL in the device config must also be changed
+    (Strategy A + hosts).
+    """
+    hostname = request.url.hostname or "127.0.0.1"
+
+    proxy_available = _check_port_443(hostname)
+
+    if proxy_available:
+        return DetectStrategyResponse(
+            proxy_available=True,
+            strategy="hosts_only",
+            message=(
+                "HTTPS Reverse-Proxy auf Port 443 erkannt. "
+                "Es reicht, die /etc/hosts-Datei zu ändern."
+            ),
+        )
+    return DetectStrategyResponse(
+        proxy_available=False,
+        strategy="bmx_and_hosts",
+        message=(
+            "Kein Reverse-Proxy auf Port 443 erkannt. "
+            "Die BMX-URL muss zusätzlich geändert werden."
+        ),
+    )
+
+
+def _check_port_443(hostname: str) -> bool:
+    """Try an SSL handshake on port 443 to detect a reverse proxy."""
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with socket.create_connection((hostname, 443), timeout=3) as sock:
+            with ctx.wrap_socket(sock, server_hostname=hostname):
+                return True
+    except Exception:
+        return False
 
 
 @wizard_router.post("/wizard/check-ports", response_model=PortCheckResponse)
@@ -195,9 +253,19 @@ async def wizard_modify_hosts(request: HostsModifyRequest):
     parsed = urlparse(request.target_addr)
     target_host = parsed.hostname or parsed.netloc
 
+    # /etc/hosts requires a numeric IP in the first field.
+    # Resolve hostname → IP so entries like "hera" become "192.168.178.11".
+    try:
+        target_ip = socket.gethostbyname(target_host)
+    except socket.gaierror:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot resolve hostname '{target_host}' to an IP address.",
+        )
+
     async with ssh_operation(request.device_ip, "modify-hosts") as ssh:
         hosts_service = SoundTouchHostsService(ssh)
-        result = await hosts_service.modify_hosts(target_host, request.include_optional)
+        result = await hosts_service.modify_hosts(target_ip, request.include_optional)
 
         if not result.success:
             return HostsModifyResponse(
@@ -306,6 +374,39 @@ async def wizard_reboot_device(request: ConnectivityCheckRequest) -> Dict[str, A
         await ssh_client.close()
 
 
+@wizard_router.post("/wizard/complete", response_model=WizardCompleteResponse)
+async def wizard_complete(request: WizardCompleteRequest, http_request: Request):
+    """Mark wizard setup as complete for a device.
+
+    Updates the device's setup_status to 'configured' in the database.
+    Called by the frontend when the user finishes the wizard.
+    """
+    from datetime import UTC, datetime
+
+    logger.info(f"Marking wizard setup complete for device {request.device_id}")
+
+    device_repo = http_request.app.state.device_repo
+    try:
+        await device_repo.update_setup_status(
+            device_id=request.device_id,
+            setup_status="configured",
+            setup_completed_at=datetime.now(UTC),
+        )
+    except Exception as e:
+        logger.exception(f"Failed to update setup status for {request.device_id}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update setup status: {e}",
+        )
+
+    return WizardCompleteResponse(
+        success=True,
+        device_id=request.device_id,
+        setup_status="configured",
+        message="Setup abgeschlossen. Gerät ist konfiguriert.",
+    )
+
+
 @wizard_router.post("/wizard/verify-redirect", response_model=VerifyRedirectResponse)
 async def wizard_verify_redirect(request: VerifyRedirectRequest):
     """Verify a domain is redirected to OCT on the device (Wizard Step 7).
@@ -338,6 +439,7 @@ async def wizard_verify_redirect(request: VerifyRedirectRequest):
                 success=False,
                 domain=request.domain,
                 resolved_ip="",
+                expected_ip=expected_resolved,
                 matches_expected=False,
                 message=f"Could not resolve {request.domain} on device. Output: {output[:200]}",
             )
@@ -349,6 +451,7 @@ async def wizard_verify_redirect(request: VerifyRedirectRequest):
             success=matches,
             domain=request.domain,
             resolved_ip=resolved_ip,
+            expected_ip=expected_resolved,
             matches_expected=matches,
             message=(
                 f"{request.domain} → {resolved_ip} ✓"

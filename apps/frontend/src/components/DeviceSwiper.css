@@ -11,19 +11,17 @@
 .swiper-container {
   position: relative;
   width: 100%;
-  height: var(--card-height, 400px); /* 400px default for desktop; overridden in media queries */
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: stretch;
   overflow: hidden;
   perspective: 1000px;
 }
 
 .swiper-card {
-  position: absolute;
   width: var(--card-width);
   max-width: 90%;
-  height: 100%;
+  margin: 0 auto;
   cursor: grab;
   user-select: none;
   touch-action: pan-y;
@@ -117,10 +115,6 @@
     padding: var(--space-lg) 0;
   }
 
-  .swiper-container {
-    --card-height: 320px;
-  }
-
   .swipe-arrow {
     width: 44px;
     height: 44px;
@@ -138,9 +132,5 @@
 @media (max-width: 480px) {
   .swipe-arrow {
     background-color: rgba(255, 255, 255, 0.05);
-  }
-
-  .swiper-container {
-    --card-height: 280px;
   }
 }

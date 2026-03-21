@@ -111,7 +111,7 @@ try {
         $projectRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
         Push-Location $projectRoot
 
-        $buildCmd = "podman build -f ./Dockerfile -t $Tag"
+        $buildCmd = "podman build -f ./deployment/Dockerfile -t $Tag"
         if ($NoCache) {
             $buildCmd += " --no-cache"
             Write-Host "    Using --no-cache (full rebuild)" -ForegroundColor Gray

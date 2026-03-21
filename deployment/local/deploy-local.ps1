@@ -78,7 +78,7 @@ try {
             $buildArgs += "--no-cache"
         }
         $buildArgs += "-f"
-        $buildArgs += "Dockerfile"
+        $buildArgs += "deployment/Dockerfile"
         $buildArgs += "."
 
         if ($Verbose) {

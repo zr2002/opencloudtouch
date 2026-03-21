@@ -3,14 +3,23 @@
 Centralizes dependency management using FastAPI app.state.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from fastapi import Request
 
 from opencloudtouch.devices.repository import DeviceRepository
 from opencloudtouch.devices.service import DeviceService
 from opencloudtouch.presets.repository import PresetRepository
 from opencloudtouch.presets.service import PresetService
+from opencloudtouch.recents.repository import RecentsRepository
 from opencloudtouch.settings.repository import SettingsRepository
 from opencloudtouch.settings.service import SettingsService
+from opencloudtouch.zones.service import ZoneService
+
+if TYPE_CHECKING:
+    from opencloudtouch.setup.service import SetupService
 
 
 async def get_device_repo(request: Request) -> DeviceRepository:
@@ -28,6 +37,11 @@ async def get_preset_repository(request: Request) -> PresetRepository:
     return request.app.state.preset_repo
 
 
+async def get_recents_repository(request: Request) -> RecentsRepository:
+    """Get recents repository instance from app.state (FastAPI dependency)."""
+    return request.app.state.recents_repo
+
+
 async def get_preset_service(request: Request) -> PresetService:
     """Get preset service instance from app.state (FastAPI dependency)."""
     return request.app.state.preset_service
@@ -41,3 +55,13 @@ async def get_settings_repo(request: Request) -> SettingsRepository:
 async def get_settings_service(request: Request) -> SettingsService:
     """Get settings service instance from app.state (FastAPI dependency)."""
     return request.app.state.settings_service
+
+
+async def get_zone_service(request: Request) -> ZoneService:
+    """Get zone service instance from app.state (FastAPI dependency)."""
+    return request.app.state.zone_service
+
+
+async def get_setup_service(request: Request) -> SetupService:
+    """Get setup service instance from app.state (FastAPI dependency)."""
+    return request.app.state.setup_service

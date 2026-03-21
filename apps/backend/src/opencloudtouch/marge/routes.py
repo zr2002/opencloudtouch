@@ -7,7 +7,10 @@ from xml.etree import ElementTree as ET
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 
-from opencloudtouch.core.dependencies import get_preset_repository
+from opencloudtouch.core.dependencies import (
+    get_preset_repository,
+    get_recents_repository,
+)
 from opencloudtouch.marge.xml_builder import (
     build_devices_xml,
     build_full_account_xml,
@@ -16,6 +19,7 @@ from opencloudtouch.marge.xml_builder import (
     build_sources_xml,
 )
 from opencloudtouch.presets.repository import PresetRepository
+from opencloudtouch.recents.repository import RecentsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,7 @@ def _xml_response(element: ET.Element, media_type: str = _MEDIA_XML) -> Response
 async def get_full_account(
     device_id: str,
     preset_repo: PresetRepository = Depends(get_preset_repository),
+    recents_repo: RecentsRepository = Depends(get_recents_repository),
 ) -> Response:
     """Get full account sync for device.
 
@@ -54,19 +59,19 @@ async def get_full_account(
     Args:
         device_id: Device MAC address (e.g., "689E194F7D2F")
         preset_repo: Preset repository dependency
+        recents_repo: Recents repository dependency
 
     Returns:
         XML Response with <boseAccount> structure
     """
     logger.info(f"[MARGE] Full account sync for device {device_id}")
 
-    # Load presets from database
     presets = await preset_repo.get_all_presets(device_id)
+    recents = await recents_repo.get_recents(device_id)
 
-    # TODO: Load recents from database (not implemented yet)
-    recents: list[Any] = []
-
-    logger.info(f"[MARGE] Returning {len(presets)} presets for {device_id}")
+    logger.info(
+        f"[MARGE] Returning {len(presets)} presets, {len(recents)} recents for {device_id}"
+    )
 
     return _xml_response(build_full_account_xml(presets, recents))
 
@@ -93,19 +98,22 @@ async def get_presets(
 
 
 @router.get("/v1/systems/devices/{device_id}/recents")
-async def get_recents(device_id: str) -> Response:
+async def get_recents(
+    device_id: str,
+    recents_repo: RecentsRepository = Depends(get_recents_repository),
+) -> Response:
     """Get recently played items for device.
 
     Args:
         device_id: Device MAC address
+        recents_repo: Recents repository dependency
 
     Returns:
         XML Response with <recents> structure
     """
     logger.info(f"[MARGE] Get recents for device {device_id}")
 
-    # TODO: Load recents from database
-    recents: list[Any] = []
+    recents = await recents_repo.get_recents(device_id)
 
     return _xml_response(build_recents_xml(recents))
 

@@ -1,77 +1,100 @@
-/* Volume Slider */
+/* Volume Slider — A3 DOM-direct, 60fps smooth */
 .volume-slider {
   display: flex;
   align-items: center;
-  /* REFACT-142: Explicit min 12px gap prevents misclick between icon and slider */
-  gap: 12px;
-  padding: var(--space-md);
-  background-color: var(--color-bg-card);
-  border: 1px solid var(--color-border);
+  gap: 10px;
+  padding: 0 12px;
+  height: 40px;
   border-radius: var(--border-radius-md);
+  background-color: var(--color-bg-darker);
 }
 
 .volume-mute {
-  width: 44px;
-  height: 44px;
-  font-size: 20px;
-  border-radius: var(--border-radius-sm);
-  background-color: var(--color-bg-darker);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
   min-width: auto;
   min-height: auto;
-  transition: all 0.2s ease;
-}
-
-.volume-mute:hover:not(:disabled) {
-  background-color: var(--color-border);
-}
-
-.volume-mute.muted {
-  background-color: #cc0000;
-}
-
-.volume-input {
-  flex: 1;
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(
-    to right,
-    var(--color-accent) 0%,
-    var(--color-accent) var(--volume-percent, 50%),
-    var(--color-border) var(--volume-percent, 50%),
-    var(--color-border) 100%
-  );
   outline: none;
-  -webkit-appearance: none;
-  appearance: none;
+  color: var(--color-text-primary);
 }
 
-.volume-input:focus-visible {
+.volume-mute:hover {
+  opacity: 0.8;
+}
+
+.volume-mute.muted svg path {
+  fill: #cc4444;
+}
+
+/* Track container — full 40px height = touch target */
+.volume-track {
+  flex: 1;
+  position: relative;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.volume-track:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 4px;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
-.volume-input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background-color: var(--color-accent);
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.volume-input::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background-color: var(--color-accent);
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.volume-input:disabled {
+.volume-track.muted {
   opacity: 0.5;
-  cursor: not-allowed;
+}
+
+/* Background rail */
+.volume-track-bg {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Colored fill */
+.volume-track-fill {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  pointer-events: none;
+  /* NO transition — DOM-direct updates must be instant */
+}
+
+/* Thumb — always visible */
+.volume-thumb {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  /* NO left-transition — kills the hakelig effect */
+  transition: transform 0.1s ease; /* only scale on :active */
+}
+
+.volume-track:active .volume-thumb {
+  transform: translate(-50%, -50%) scale(1.2);
 }

@@ -45,6 +45,14 @@ describe("Preset Management Advanced", () => {
     return cy.get('[data-testid="loading-indicator"]', { timeout: 10000 }).should("not.exist");
   };
 
+  /** Click search result → StationDetail → "Als Preset speichern" */
+  const selectFirstSearchResult = () => {
+    cy.get(".search-result-item", { timeout: 10000 }).should("have.length.at.least", 1);
+    cy.get(".search-result-item").first().click();
+    // StationDetail opens — click the select button
+    cy.get(".sd-select", { timeout: 10000 }).should("be.visible").click();
+  };
+
   beforeEach(() => {
     apiUrl = (Cypress.expose('apiUrl') as string) ?? 'http://localhost:7778/api';
 
@@ -102,8 +110,7 @@ describe("Preset Management Advanced", () => {
           // Search and select
           cy.get(".search-input").type("BBC");
           cy.get(".search-results", { timeout: 10000 }).should("be.visible");
-          cy.get(".search-result-item", { timeout: 10000 }).should("have.length.at.least", 1);
-          cy.get(".search-result-item").first().click();
+          selectFirstSearchResult();
 
           // Wait for API call to complete and modal to close
           cy.get(".radio-search-modal", { timeout: 10000 }).should("not.exist");
@@ -168,8 +175,7 @@ describe("Preset Management Advanced", () => {
       cy.get(".radio-search-modal", { timeout: 10000 }).should("be.visible");
       cy.get(".search-input").type("NPR");
       cy.get(".search-results", { timeout: 10000 }).should("be.visible");
-      cy.get(".search-result-item", { timeout: 10000 }).should("have.length.at.least", 1);
-      cy.get(".search-result-item").first().click();
+      selectFirstSearchResult();
 
       // Wait for API call to complete and modal to close
       cy.get(".radio-search-modal", { timeout: 10000 }).should("not.exist");
@@ -211,8 +217,7 @@ describe("Preset Management Advanced", () => {
       // Select new station
       cy.get(".search-input").type("NPR");
       cy.get(".search-results", { timeout: 10000 }).should("be.visible");
-      cy.get(".search-result-item", { timeout: 10000 }).should("have.length.at.least", 1);
-      cy.get(".search-result-item").first().click();
+      selectFirstSearchResult();
 
       // Verify preset overwritten
       cy.get(".radio-search-modal", { timeout: 10000 }).should("not.exist");
@@ -240,8 +245,7 @@ describe("Preset Management Advanced", () => {
 
         cy.get(".search-input").clear().type(station.name);
         cy.get(".search-results", { timeout: 10000 }).should("be.visible");
-        cy.get(".search-result-item", { timeout: 10000 }).should("have.length.at.least", 1);
-        cy.get(".search-result-item").first().click();
+        selectFirstSearchResult();
 
         // Wait for API call to complete and modal to close
         cy.get(".radio-search-modal", { timeout: 10000 }).should("not.exist");
@@ -348,8 +352,7 @@ describe("Preset Management Advanced", () => {
       cy.get(".radio-search-modal", { timeout: 10000 }).should("be.visible");
       cy.get(".search-input").type("BBC");
       cy.get(".search-results", { timeout: 10000 }).should("be.visible");
-      cy.get(".search-result-item", { timeout: 10000 }).should("have.length.at.least", 1);
-      cy.get(".search-result-item").first().click();
+      selectFirstSearchResult();
 
       // Loading indicator should exist in DOM during the API call
       // (modal overlay may cover it visually, but loading state IS active)
@@ -450,8 +453,7 @@ describe("Preset Management Advanced", () => {
       cy.get(".radio-search-modal", { timeout: 10000 }).should("be.visible");
       cy.get(".search-input").type("BBC");
       cy.get(".search-results", { timeout: 10000 }).should("be.visible");
-      cy.get(".search-result-item", { timeout: 10000 }).should("have.length.at.least", 1);
-      cy.get(".search-result-item").first().click();
+      selectFirstSearchResult();
 
       // Wait for error state and modal to remain open
       cy.get(".error-message", { timeout: 5000 }).should("be.visible");
@@ -501,8 +503,7 @@ describe("Preset Management Advanced", () => {
       cy.get(".radio-search-modal", { timeout: 10000 }).should("be.visible");
       cy.get(".search-input").type("BBC");
       cy.get(".search-results", { timeout: 10000 }).should("be.visible");
-      cy.get(".search-result-item", { timeout: 10000 }).should("have.length.at.least", 1);
-      cy.get(".search-result-item").first().click();
+      selectFirstSearchResult();
       cy.wait("@setPresetFail");
 
       cy.get('[data-testid="error-message"]').should("be.visible");

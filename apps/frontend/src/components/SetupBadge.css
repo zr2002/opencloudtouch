@@ -7,14 +7,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 2px solid;
   background: var(--color-bg-card, #1e1e1e);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 20px;
+  font-size: 14px;
   padding: 0;
   flex-shrink: 0;
 }
@@ -44,6 +44,18 @@
 .badge-unconfigured:hover {
   border-color: #fb923c;
   background: rgba(249, 115, 22, 0.2);
+}
+
+/* Unknown State - Subtle neutral gray (no animation) */
+.badge-unknown {
+  border-color: rgba(150, 150, 150, 0.3);
+  color: rgba(150, 150, 150, 0.5);
+  background: transparent;
+}
+
+.badge-unknown:hover {
+  border-color: rgba(150, 150, 150, 0.6);
+  background: rgba(150, 150, 150, 0.08);
 }
 
 @keyframes badge-pulse {
@@ -90,6 +102,33 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Outdated State - Amber/Orange warning */
+.badge-outdated {
+  border-color: #d97706;
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+.badge-outdated:hover {
+  border-color: #f59e0b;
+  background: rgba(217, 119, 6, 0.2);
+}
+
+/* Offline State - Dimmed gray */
+.badge-offline {
+  border-color: rgba(100, 100, 100, 0.4);
+  color: rgba(100, 100, 100, 0.5);
+  background: transparent;
+  opacity: 0.5;
+}
+
+.badge-offline:hover {
+  border-color: rgba(100, 100, 100, 0.6);
+  background: rgba(100, 100, 100, 0.08);
+  opacity: 0.7;
 }
 
 .badge-icon {

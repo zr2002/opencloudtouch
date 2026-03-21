@@ -18,6 +18,7 @@ from opencloudtouch.devices.client import (
     NowPlayingInfo,
     VolumeInfo,
 )
+from opencloudtouch.zones.models import ZoneMemberInfo, ZoneStatus
 
 logger = logging.getLogger(__name__)
 
@@ -350,5 +351,141 @@ class BoseDeviceClientAdapter(DeviceClient):
 
     async def close(self) -> None:
         """Close client connections (no-op for bosesoundtouchapi)."""
-        # BoseClient doesn't require explicit cleanup
         pass
+
+    # ---- Zone Methods ----
+
+    def _zone_to_status(self, zone) -> ZoneStatus | None:
+        """Convert bosesoundtouchapi Zone to ZoneStatus."""
+        if not zone or not zone.MasterDeviceId:
+            return None
+        members = [
+            ZoneMemberInfo(
+                device_id=m.DeviceId or "",
+                ip_address=m.IpAddress or "",
+                role="master" if m.DeviceId == zone.MasterDeviceId else "slave",
+            )
+            for m in (zone.Members or [])
+        ]
+        if not members:
+            return None
+        # Ensure master is always present in the members list.
+        # Some SoundTouch devices omit the master from the member list
+        # when queried from certain perspectives.
+        if not any(m.device_id == zone.MasterDeviceId for m in members):
+            members.insert(
+                0,
+                ZoneMemberInfo(
+                    device_id=zone.MasterDeviceId,
+                    ip_address=zone.MasterIpAddress or "",
+                    role="master",
+                ),
+            )
+        return ZoneStatus(
+            master_id=zone.MasterDeviceId,
+            master_ip=zone.MasterIpAddress or "",
+            is_master=bool(zone.IsZoneMaster),
+            members=members,
+        )
+
+    async def get_zone_status(self) -> ZoneStatus | None:
+        """Get current zone status from device."""
+        try:
+            zone = self._client.GetZoneStatus(refresh=True)
+            return self._zone_to_status(zone)
+        except Exception as e:
+            logger.error(
+                f"Failed to get zone status from {self.base_url}: {e}", exc_info=True
+            )
+            raise DeviceConnectionError(self.ip, str(e)) from e
+
+    async def create_zone(
+        self, master_ip: str, members: list[ZoneMemberInfo]
+    ) -> ZoneStatus:
+        """Create a new multi-room zone."""
+        try:
+            from bosesoundtouchapi.models import Zone, ZoneMember
+
+            master_device_id = self._client.Device.DeviceId
+
+            # Build Zone object: master as first member, then slaves
+            # Must use AddMember() since Zone constructor mishandles ZoneMember list
+            zone = Zone(
+                masterDeviceId=master_device_id,
+                masterIpAddress=master_ip,
+                isZoneMaster=True,
+            )
+            # Master must be first member in zone XML
+            zone._Members.append(
+                ZoneMember(ipAddress=master_ip, deviceId=master_device_id)
+            )
+            for m in members:
+                zone.AddMember(ZoneMember(ipAddress=m.ip_address, deviceId=m.device_id))
+
+            logger.info(
+                f"Creating zone on {self.ip} with {len(members)} slave(s)",
+                extra={"master_ip": master_ip, "member_count": len(members)},
+            )
+
+            self._client.CreateZone(zone, delay=3)
+
+            result = self._client.GetZoneStatus(refresh=True)
+            return self._zone_to_status(result) or ZoneStatus(
+                master_id=master_device_id,
+                master_ip=master_ip,
+                is_master=True,
+                members=[
+                    ZoneMemberInfo(
+                        device_id=m.device_id, ip_address=m.ip_address, role="slave"
+                    )
+                    for m in members
+                ],
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to create zone on {self.base_url}: {e}", exc_info=True
+            )
+            raise DeviceConnectionError(self.ip, str(e)) from e
+
+    async def add_zone_members(self, members: list[ZoneMemberInfo]) -> None:
+        """Add members to existing zone."""
+        try:
+            from bosesoundtouchapi.models import ZoneMember
+
+            zone_members = [
+                ZoneMember(ipAddress=m.ip_address, deviceId=m.device_id)
+                for m in members
+            ]
+            self._client.AddZoneMembers(zone_members, delay=3)
+        except Exception as e:
+            logger.error(
+                f"Failed to add zone members on {self.base_url}: {e}", exc_info=True
+            )
+            raise DeviceConnectionError(self.ip, str(e)) from e
+
+    async def remove_zone_members(self, members: list[ZoneMemberInfo]) -> None:
+        """Remove members from existing zone."""
+        try:
+            from bosesoundtouchapi.models import ZoneMember
+
+            zone_members = [
+                ZoneMember(ipAddress=m.ip_address, deviceId=m.device_id)
+                for m in members
+            ]
+            self._client.RemoveZoneMembers(zone_members, delay=3)
+        except Exception as e:
+            logger.error(
+                f"Failed to remove zone members on {self.base_url}: {e}", exc_info=True
+            )
+            raise DeviceConnectionError(self.ip, str(e)) from e
+
+    async def remove_zone(self) -> None:
+        """Dissolve entire zone."""
+        try:
+            self._client.RemoveZone(delay=3)
+            logger.info("Zone removed on %s", self.base_url)
+        except Exception as e:
+            logger.error(
+                f"Failed to remove zone on {self.base_url}: {e}", exc_info=True
+            )
+            raise DeviceConnectionError(self.ip, str(e)) from e

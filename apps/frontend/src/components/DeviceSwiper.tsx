@@ -142,7 +142,7 @@ export default function DeviceSwiper({
               opacity: { duration: 0.2 },
               scale: { duration: 0.2 },
             }}
-            drag="x"
+            drag={false}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.2}
             onDragEnd={handleDragEnd}

@@ -1,8 +1,14 @@
-import { useState, useEffect, ChangeEvent } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import DeviceSwiper, { Device } from "../components/DeviceSwiper";
-import { NowPlayingData } from "../components/NowPlaying";
+import NowPlaying from "../components/NowPlaying";
+import VolumeSlider from "../components/VolumeSlider";
 import SetupBadge from "../components/SetupBadge";
+import { useNowPlaying } from "../hooks/useNowPlaying";
+import { useVolume } from "../hooks/useVolume";
+import { useZones } from "../hooks/useZones";
+import { togglePlayPause, nextTrack, prevTrack, power } from "../api/devices";
 import "./LocalControl.css";
 
 type SourceId = "INTERNET_RADIO" | "BLUETOOTH" | "AUX" | "AIRPLAY";
@@ -27,47 +33,53 @@ interface LocalControlProps {
 
 export default function LocalControl({ devices = [] }: LocalControlProps) {
   const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0);
-  const [volume, setVolume] = useState(45);
-  const [muted, setMuted] = useState(false);
   const [selectedSource, setSelectedSource] = useState<SourceId>("INTERNET_RADIO");
-  const [playState, setPlayState] = useState<"PLAY_STATE" | "PAUSE_STATE">("PLAY_STATE");
+  const [keyLoading, setKeyLoading] = useState<string | null>(null);
 
+  const navigate = useNavigate();
   const currentDevice = devices[currentDeviceIndex];
+  const deviceId = currentDevice?.device_id;
 
-  // Temporary: Set nowPlaying to null properly typed
-  const nowPlaying = null as NowPlayingData | null;
+  const { nowPlaying } = useNowPlaying(deviceId);
+  const { volume, muted, setDeviceVolume, toggleMute } = useVolume(deviceId);
+  const { zones } = useZones();
+
+  const deviceZone = useMemo(() => {
+    if (!deviceId) return null;
+    return zones.find((z) => z.members.some((m) => m.device_id === deviceId)) ?? null;
+  }, [zones, deviceId]);
+
+  const deviceRole = useMemo(() => {
+    if (!deviceZone || !deviceId) return null;
+    return deviceZone.members.find((m) => m.device_id === deviceId)?.role ?? null;
+  }, [deviceZone, deviceId]);
+
+  const isPlaying = nowPlaying?.state === "PLAY_STATE";
 
   useEffect(() => {
-    if (currentDevice) {
-      // Reset volume when device changes
-      setVolume(45);
-      setMuted(false);
+    if (nowPlaying?.source) {
+      const src = nowPlaying.source as SourceId;
+      if (SOURCES.some((s) => s.id === src)) {
+        setSelectedSource(src);
+      }
     }
-  }, [currentDevice]);
+  }, [nowPlaying?.source]);
 
-  const handleVolumeChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseInt(e.target.value, 10);
-    setVolume(newVolume);
-    setMuted(false);
-  };
-
-  const handleMuteToggle = () => {
-    setMuted(!muted);
+  const handleKey = async (key: string, fn: (id: string) => Promise<void>) => {
+    if (!deviceId || keyLoading) return;
+    setKeyLoading(key);
+    try {
+      await fn(deviceId);
+    } catch (err) {
+      console.error(`[LocalControl] Key ${key} failed:`, err);
+    } finally {
+      setKeyLoading(null);
+    }
   };
 
   const handleSourceChange = (sourceId: SourceId) => {
     setSelectedSource(sourceId);
   };
-
-  const handlePlayPause = () => {
-    const newState: "PLAY_STATE" | "PAUSE_STATE" =
-      playState === "PLAY_STATE" ? "PAUSE_STATE" : "PLAY_STATE";
-    setPlayState(newState);
-  };
-
-  // const handleOpenSetupWizard = (device: Device) => {
-  //   navigate(`/setup-wizard?deviceId=${device.device_id}`);
-  // };
 
   if (devices.length === 0) {
     return (
@@ -77,7 +89,6 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
     );
   }
 
-  const displayVolume = muted ? 0 : volume;
   const supportedSources = SOURCES.filter((source) => {
     if (source.supported === "conditional") {
       return currentDevice?.capabilities?.airplay || false;
@@ -95,20 +106,33 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
         onIndexChange={setCurrentDeviceIndex}
       >
         <div className="control-card">
-          {/* Coming-Soon Banner */}
-          <div className="control-coming-soon-banner" role="note" aria-label="Hinweis">
-            ℹ️ <strong>Direkte Gerätesteuerung</strong> ist in Vorbereitung. Lautstärke und
-            Quellauswahl werden in einer späteren Version live mit dem Gerät verbunden. Nutzen Sie
-            bis dahin die Tasten am Gerät.
-          </div>
-
-          {/* Device Header */}
+          {/* Device Header: Power (left) | Name | Settings (right) */}
           <div className="control-card-header">
+            <div className="device-header-left">
+              <button
+                className="power-header-btn on"
+                onClick={() => handleKey("POWER", power)}
+                disabled={keyLoading === "POWER"}
+                aria-label="Ein/Ausschalten"
+                title="Ein/Ausschalten"
+              >
+                {keyLoading === "POWER" ? "⏳" : "⏻"}
+              </button>
+            </div>
             <div className="device-header-info">
               <h2 className="device-name">{currentDevice?.name}</h2>
               <span className="device-model">{currentDevice?.model || "Unknown Model"}</span>
             </div>
-            <div className="device-header-actions">
+            <div className="device-header-right">
+              {deviceZone && (
+                <button
+                  className="zone-indicator-badge"
+                  onClick={() => navigate("/multiroom")}
+                  title={`Zone: ${deviceRole === "master" ? "Master" : "Slave"}`}
+                >
+                  🔗 {deviceRole === "master" ? "Master" : "Zone"}
+                </button>
+              )}
               {currentDevice && (
                 <SetupBadge
                   deviceId={currentDevice.device_id}
@@ -118,26 +142,39 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
             </div>
           </div>
 
+          {/* Now Playing */}
+          {nowPlaying && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <NowPlaying
+                nowPlaying={{
+                  station: nowPlaying.station_name,
+                  track: nowPlaying.track,
+                  artist: nowPlaying.artist,
+                  art_url: nowPlaying.artwork_url,
+                  play_status: nowPlaying.state,
+                  source: nowPlaying.source,
+                }}
+                onPlayPause={() => handleKey("PLAY_PAUSE", togglePlayPause)}
+              />
+            </motion.div>
+          )}
+
           {/* Volume Control */}
           <motion.div
             className="volume-section"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            transition={{ delay: 0.2 }}
           >
-            <div className="volume-header">
-              <span className="volume-icon">{muted ? "🔇" : "🔊"}</span>
-              <span className="volume-label">Lautstärke</span>
-              <span className="volume-value">{displayVolume}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={volume}
-              onChange={handleVolumeChange}
-              className="lc-volume-range"
-              disabled={muted}
+            <VolumeSlider
+              volume={volume}
+              muted={muted}
+              onVolumeChange={setDeviceVolume}
+              onMuteToggle={toggleMute}
             />
           </motion.div>
 
@@ -146,7 +183,7 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
             className="source-section"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.3 }}
           >
             <h3 className="source-title">Quelle</h3>
             <div className="source-tabs">
@@ -163,42 +200,40 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
             </div>
           </motion.div>
 
-          {/* Now Playing Info (if available) */}
-          {nowPlaying && selectedSource === "INTERNET_RADIO" && (
-            <motion.div
-              className="now-playing-info"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <div className="now-playing-text">
-                <div className="station-name">{nowPlaying.station || "Kein Sender"}</div>
-                <div className="track-info">{nowPlaying.track || "Keine Wiedergabe"}</div>
-              </div>
-            </motion.div>
-          )}
-
           {/* Playback Controls */}
           <motion.div
             className="playback-section"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.5 }}
           >
             <h3 className="playback-title">Wiedergabe</h3>
             <div className="playback-controls">
-              <button className="playback-button previous" disabled title="Kommt in Phase 3">
-                <span className="playback-icon">⏮</span>
+              <button
+                className="playback-button previous"
+                onClick={() => handleKey("PREV_TRACK", prevTrack)}
+                disabled={keyLoading === "PREV_TRACK"}
+                aria-label="Vorheriger Track"
+              >
+                <span className="playback-icon">{keyLoading === "PREV_TRACK" ? "⏳" : "⏮"}</span>
               </button>
               <button
                 className="playback-button play-pause primary"
-                onClick={handlePlayPause}
-                disabled={selectedSource === "AUX"}
+                onClick={() => handleKey("PLAY_PAUSE", togglePlayPause)}
+                disabled={keyLoading === "PLAY_PAUSE"}
+                aria-label={isPlaying ? "Pause" : "Play"}
               >
-                <span className="playback-icon">{playState === "PLAY_STATE" ? "⏸️" : "▶️"}</span>
+                <span className="playback-icon">
+                  {keyLoading === "PLAY_PAUSE" ? "⏳" : isPlaying ? "⏸️" : "▶️"}
+                </span>
               </button>
-              <button className="playback-button next" disabled title="Kommt in Phase 3">
-                <span className="playback-icon">⏭</span>
+              <button
+                className="playback-button next"
+                onClick={() => handleKey("NEXT_TRACK", nextTrack)}
+                disabled={keyLoading === "NEXT_TRACK"}
+                aria-label="Nächster Track"
+              >
+                <span className="playback-icon">{keyLoading === "NEXT_TRACK" ? "⏳" : "⏭"}</span>
               </button>
             </div>
           </motion.div>
@@ -208,18 +243,20 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
             className="quick-actions"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.6 }}
           >
-            <button
-              className={`quick-action-button ${muted ? "active" : ""}`}
-              onClick={handleMuteToggle}
-            >
+            <button className={`quick-action-button ${muted ? "active" : ""}`} onClick={toggleMute}>
               <span className="quick-action-icon">{muted ? "🔇" : "🔊"}</span>
               <span className="quick-action-label">{muted ? "Ton an" : "Stumm"}</span>
             </button>
-            <button className="quick-action-button standby" disabled title="Kommt in Phase 3">
-              <span className="quick-action-icon">💤</span>
-              <span className="quick-action-label">Standby</span>
+            <button
+              className={`quick-action-button ${deviceZone ? "active" : ""}`}
+              onClick={() => navigate("/multiroom")}
+            >
+              <span className="quick-action-icon">🔗</span>
+              <span className="quick-action-label">
+                {deviceZone ? "Zone verwalten" : "Multi-Room"}
+              </span>
             </button>
           </motion.div>
         </div>

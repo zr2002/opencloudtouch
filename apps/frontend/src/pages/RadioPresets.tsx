@@ -8,7 +8,7 @@ import RadioSearch, { RadioStation } from "../components/RadioSearch";
 import VolumeSlider from "../components/VolumeSlider";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { PresetSkeleton } from "../components/LoadingSkeleton";
-import { playPreset as playPresetAPI } from "../api/devices";
+import { playPreset as playPresetAPI, togglePlayPause, power } from "../api/devices";
 import { usePresets } from "../hooks/usePresets";
 import { useVolume } from "../hooks/useVolume";
 import { useNowPlaying } from "../hooks/useNowPlaying";
@@ -34,7 +34,10 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
   const { show: showToast } = useToast();
   const [playError, setPlayError] = useState<string | null>(null);
   const [playLoading, setPlayLoading] = useState(false);
-  const [confirmClear, setConfirmClear] = useState<number | null>(null);
+  const [powerLoading, setPowerLoading] = useState(false);
+  const [pendingStation, setPendingStation] = useState<RadioStation | null>(null);
+
+  const isStandby = npState?.source === "STANDBY";
 
   // Map backend NowPlayingState to NowPlayingData for component
   const nowPlaying = npState
@@ -44,6 +47,7 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
         track: npState.track,
         artist: npState.artist,
         play_status: npState.state,
+        source: npState.source,
       }
     : null;
 
@@ -77,9 +81,37 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
   const handleStationSelect = async (station: RadioStation) => {
     if (!assigningPreset || !currentDevice?.device_id) return;
 
-    await assignStation(assigningPreset, station, currentDevice.device_id);
+    // If preset slot already has a station, ask for overwrite confirmation
+    if (presets[assigningPreset]) {
+      setPendingStation(station);
+      return;
+    }
+
+    await doAssign(assigningPreset, station);
+  };
+
+  const doAssign = async (presetNumber: number, station: RadioStation) => {
+    if (!currentDevice?.device_id) return;
+
+    await assignStation(presetNumber, station, currentDevice.device_id);
     setAssigningPreset(null);
     setSearchOpen(false);
+    setPendingStation(null);
+    showToast(`Preset ${presetNumber} gespeichert.`, "success");
+  };
+
+  const handleConfirmOverwrite = async () => {
+    if (pendingStation && assigningPreset) {
+      await doAssign(assigningPreset, pendingStation);
+    }
+  };
+
+  const handleDeletePreset = async () => {
+    if (!assigningPreset || !currentDevice?.device_id) return;
+    await removePreset(assigningPreset, currentDevice.device_id);
+    setSearchOpen(false);
+    setAssigningPreset(null);
+    showToast(`Preset ${assigningPreset} gelöscht.`, "success");
   };
 
   const handlePlayPreset = async (presetNumber: number) => {
@@ -90,27 +122,12 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
 
     try {
       await playPresetAPI(currentDevice.device_id, presetNumber);
-
-      // Success feedback could be added here (e.g., toast notification)
-      console.log(`Playing preset ${presetNumber} on ${currentDevice.name}`);
     } catch (err) {
       console.error("Failed to play preset:", err);
       setPlayError("Preset konnte nicht abgespielt werden. Bitte versuchen Sie es erneut.");
     } finally {
       setPlayLoading(false);
     }
-  };
-
-  const handleClearPreset = async (presetNumber: number) => {
-    if (!currentDevice?.device_id) return;
-    setConfirmClear(presetNumber);
-  };
-
-  const handleConfirmClear = async () => {
-    if (confirmClear === null || !currentDevice?.device_id) return;
-    const presetNumber = confirmClear;
-    setConfirmClear(null);
-    await removePreset(presetNumber, currentDevice.device_id);
   };
 
   if (devices.length === 0) {
@@ -133,6 +150,25 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
       >
         <div className="device-card" data-test="device-card">
           <div className="device-card-header">
+            <button
+              className={`power-header-btn ${isStandby ? "off" : "on"}`}
+              onClick={async () => {
+                if (!currentDevice?.device_id || powerLoading) return;
+                setPowerLoading(true);
+                try {
+                  await power(currentDevice.device_id);
+                } catch (err) {
+                  console.error("[RadioPresets] Power failed:", err);
+                } finally {
+                  setPowerLoading(false);
+                }
+              }}
+              disabled={powerLoading}
+              aria-label="Ein/Ausschalten"
+              title="Ein/Ausschalten"
+            >
+              {powerLoading ? "⏳" : "⏻"}
+            </button>
             <div className="device-info">
               <h2 className="device-name" data-test="device-name">
                 {currentDevice?.name || "Unknown Device"}
@@ -152,7 +188,20 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
             )}
           </div>
 
-          <NowPlaying nowPlaying={nowPlaying} />
+          <NowPlaying
+            nowPlaying={nowPlaying}
+            onPlayPause={
+              currentDevice
+                ? async () => {
+                    if (isStandby) {
+                      await power(currentDevice.device_id);
+                    } else {
+                      await togglePlayPause(currentDevice.device_id);
+                    }
+                  }
+                : undefined
+            }
+          />
 
           <VolumeSlider
             volume={volume}
@@ -220,10 +269,32 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
                   number={num}
                   preset={presets[num]}
                   onAssign={() => handleAssignClick(num)}
-                  onClear={() => handleClearPreset(num)}
                   onPlay={() => handlePlayPreset(num)}
+                  isCurrentlyPlaying={
+                    npState?.state === "PLAY_STATE" &&
+                    npState?.station_name === presets[num]?.station_name
+                  }
                 />
               ))}
+        </div>
+      </div>
+
+      {/* Info Box */}
+      <div className="presets-info-box">
+        <div className="presets-info-icon">ℹ️</div>
+        <div className="presets-info-content">
+          <h4 className="presets-info-title">Preset Hinweise</h4>
+          <ul className="presets-info-list">
+            <li>Klicke auf ein leeres Preset um einen Sender zuzuweisen</li>
+            <li>Klicke auf einen belegten Sender um ihn zu ändern oder zu löschen</li>
+            <li>▶ spielt den gespeicherten Sender direkt ab</li>
+            <li>
+              <span className="badge-example compatible">✓</span> = Cloud-unabhängig,{" "}
+              <span className="badge-example dependent">☁</span> = Bose Cloud erforderlich
+            </li>
+            <li>⚙️ öffnet den Setup-Wizard für das Gerät</li>
+            <li>&bdquo;Vom Gerät laden&ldquo; synchronisiert die Presets vom SoundTouch</li>
+          </ul>
         </div>
       </div>
 
@@ -233,19 +304,23 @@ export default function RadioPresets({ devices = [] }: RadioPresetsProps) {
         onClose={() => {
           setSearchOpen(false);
           setAssigningPreset(null);
+          setPendingStation(null);
         }}
         onStationSelect={handleStationSelect}
+        onDelete={handleDeletePreset}
+        presetNumber={assigningPreset}
+        hasExistingPreset={assigningPreset !== null && !!presets[assigningPreset]}
       />
 
-      {/* Confirm Delete Dialog — REFACT-107 */}
+      {/* Confirm Overwrite Dialog */}
       <ConfirmDialog
-        open={confirmClear !== null}
-        title="Preset löschen"
-        message={`Möchten Sie Preset ${confirmClear} wirklich löschen?`}
-        confirmLabel="Löschen"
+        open={pendingStation !== null}
+        title="Preset überschreiben"
+        message={`Möchten Sie Preset ${assigningPreset} wirklich überschreiben?`}
+        confirmLabel="Überschreiben"
         cancelLabel="Abbrechen"
-        onConfirm={handleConfirmClear}
-        onCancel={() => setConfirmClear(null)}
+        onConfirm={handleConfirmOverwrite}
+        onCancel={() => setPendingStation(null)}
       />
     </div>
   );

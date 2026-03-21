@@ -161,6 +161,15 @@ async def bmx_services() -> JSONResponse:
             ),
             streamTypes=["liveRadio"],
         ),
+        BmxService(
+            id=BmxServiceId(name="RADIOBROWSER", value=99),
+            baseUrl=f"{base_url}/bmx/radiobrowser",
+            assets=BmxServiceAssets(
+                name="RadioBrowser",
+                description="Community radio stations via RadioBrowser.info",
+            ),
+            streamTypes=["liveRadio"],
+        ),
     ]
 
     response = BmxServicesResponse(bmx_services=services)

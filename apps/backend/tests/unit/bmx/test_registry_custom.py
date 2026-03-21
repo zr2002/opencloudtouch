@@ -27,7 +27,7 @@ class TestBmxRegistry:
         # Parse response content
         content = json.loads(result.body.decode())
         assert "bmx_services" in content
-        assert len(content["bmx_services"]) == 2
+        assert len(content["bmx_services"]) == 3
 
         # Check TUNEIN service
         tunein = next(s for s in content["bmx_services"] if s["id"]["name"] == "TUNEIN")
@@ -42,6 +42,13 @@ class TestBmxRegistry:
         )
         assert local["assets"]["name"] == "Custom Stations"
         assert "liveRadio" in local["streamTypes"]
+
+        # Check RADIOBROWSER service
+        rb = next(
+            s for s in content["bmx_services"] if s["id"]["name"] == "RADIOBROWSER"
+        )
+        assert rb["assets"]["name"] == "RadioBrowser"
+        assert "liveRadio" in rb["streamTypes"]
 
     @pytest.mark.asyncio
     async def test_bmx_services_custom_url(self):

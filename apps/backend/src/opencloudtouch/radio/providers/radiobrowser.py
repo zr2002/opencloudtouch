@@ -118,29 +118,53 @@ class RadioBrowserAdapter(RadioProvider):
     Adapter for RadioBrowser.info API.
 
     Provides search and retrieval of radio stations from the RadioBrowser database.
-    Uses multiple API servers for redundancy.
+    Uses multiple API servers for redundancy with automatic failover.
+    Maintains a shared httpx.AsyncClient for DNS caching and connection pooling.
     """
 
     # Known RadioBrowser API servers (load-balanced)
-    # Using all.api.radio-browser.info which resolves to multiple IPs
     API_SERVERS = [
-        "https://all.api.radio-browser.info",
         "https://de1.api.radio-browser.info",
         "https://nl1.api.radio-browser.info",
         "https://at1.api.radio-browser.info",
     ]
 
-    def __init__(self, timeout: float = 10.0, max_retries: int = 3):
+    def __init__(self, timeout: float = 10.0, max_retries: int = 2):
         """
         Initialize RadioBrowser adapter.
 
         Args:
             timeout: Request timeout in seconds
-            max_retries: Maximum number of retry attempts
+            max_retries: Maximum retry attempts per server
         """
         self.timeout = timeout
         self.max_retries = max_retries
-        self.base_url = random.choice(self.API_SERVERS)
+        self._server_index = random.randint(0, len(self.API_SERVERS) - 1)
+        self._client: httpx.AsyncClient | None = None
+
+    @property
+    def base_url(self) -> str:
+        """Current API server URL."""
+        return self.API_SERVERS[self._server_index % len(self.API_SERVERS)]
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """Get or create shared httpx client with connection pooling."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=self.timeout,
+                trust_env=False,
+                limits=httpx.Limits(
+                    max_connections=10,
+                    max_keepalive_connections=5,
+                ),
+            )
+        return self._client
+
+    async def close(self) -> None:
+        """Close the shared HTTP client."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
 
     @property
     def provider_name(self) -> str:
@@ -273,7 +297,10 @@ class RadioBrowserAdapter(RadioProvider):
         self, endpoint: str, params: Optional[Dict[str, Any]] = None
     ) -> Any:
         """
-        Make HTTP request to RadioBrowser API with retry logic.
+        Make HTTP request to RadioBrowser API with server failover.
+
+        Tries the current server with retries, then fails over to other servers.
+        Uses a shared httpx.AsyncClient for connection pooling and DNS caching.
 
         Args:
             endpoint: API endpoint path
@@ -284,27 +311,45 @@ class RadioBrowserAdapter(RadioProvider):
 
         Raises:
             RadioBrowserError: On API errors
-            RadioBrowserTimeoutError: On timeout
-            RadioBrowserConnectionError: On connection errors
+            RadioBrowserTimeoutError: On timeout (all servers exhausted)
+            RadioBrowserConnectionError: On connection errors (all servers exhausted)
         """
-        url = f"{self.base_url}{endpoint}"
+        client = self._get_client()
+        last_exception: Exception | None = None
+        servers_tried = 0
 
-        # trust_env=False to avoid Windows proxy/DNS issues
-        async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
+        for server_offset in range(len(self.API_SERVERS)):
+            server_idx = (self._server_index + server_offset) % len(self.API_SERVERS)
+            server_url = self.API_SERVERS[server_idx]
+            url = f"{server_url}{endpoint}"
+            servers_tried += 1
+
             for attempt in range(self.max_retries):
                 try:
                     response = await client.get(url, params=params or {})
                     response.raise_for_status()
+                    # Success — remember this server for next time
+                    self._server_index = server_idx
                     return response.json()
-                except (httpx.TimeoutException, httpx.ConnectError):
+                except httpx.ConnectError as e:
+                    last_exception = e
+                    # DNS/connection failure — skip to next server immediately
+                    break
+                except httpx.TimeoutException as e:
+                    last_exception = e
                     if attempt < self.max_retries - 1:
-                        # Exponential backoff
-                        wait_time = 2**attempt
-                        await asyncio.sleep(wait_time)
+                        await asyncio.sleep(0.5 * (attempt + 1))
                         continue
-                    raise
+                    # Exhausted retries for this server, try next
+                    break
                 except httpx.HTTPStatusError:
                     raise
 
-        # Should not reach here
-        raise RadioBrowserError("Request failed after retries")  # pragma: no cover
+        # All servers exhausted
+        if isinstance(last_exception, httpx.TimeoutException):
+            raise last_exception
+        if isinstance(last_exception, httpx.ConnectError):
+            raise last_exception
+        raise RadioBrowserError(  # pragma: no cover
+            f"Request failed after trying {servers_tried} servers"
+        )

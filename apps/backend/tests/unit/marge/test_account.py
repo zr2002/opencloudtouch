@@ -24,9 +24,11 @@ class TestMargeAccountEndpoints:
         device_id = "689E194F7D2F"
         mock_preset_repo = AsyncMock()
         mock_preset_repo.get_all_presets = AsyncMock(return_value=[])
+        mock_recents_repo = AsyncMock()
+        mock_recents_repo.get_recents = AsyncMock(return_value=[])
 
         # Act
-        result = await get_full_account(device_id, mock_preset_repo)
+        result = await get_full_account(device_id, mock_preset_repo, mock_recents_repo)
 
         # Assert
         assert result.status_code == 200
@@ -60,9 +62,11 @@ class TestMargeAccountEndpoints:
 
         mock_preset_repo = AsyncMock()
         mock_preset_repo.get_all_presets = AsyncMock(return_value=[mock_preset])
+        mock_recents_repo = AsyncMock()
+        mock_recents_repo.get_recents = AsyncMock(return_value=[])
 
         # Act
-        result = await get_full_account(device_id, mock_preset_repo)
+        result = await get_full_account(device_id, mock_preset_repo, mock_recents_repo)
 
         # Assert
         assert result.status_code == 200
@@ -120,9 +124,11 @@ class TestMargeAccountEndpoints:
         """Test recents endpoint with no history."""
         # Arrange
         device_id = "689E194F7D2F"
+        mock_recents_repo = AsyncMock()
+        mock_recents_repo.get_recents = AsyncMock(return_value=[])
 
         # Act
-        result = await get_recents(device_id)
+        result = await get_recents(device_id, mock_recents_repo)
 
         # Assert
         assert result.status_code == 200
@@ -222,24 +228,27 @@ class TestMargeIntegration:
         """Test full account sync with real database."""
         from opencloudtouch.marge.routes import get_full_account
         from opencloudtouch.presets.repository import PresetRepository
+        from opencloudtouch.recents.repository import RecentsRepository
 
         # Arrange
         preset_repo = PresetRepository(test_db_path)
         await preset_repo.initialize()
+        recents_repo = RecentsRepository(test_db_path)
+        await recents_repo.initialize()
 
         device_id = "TEST_DEVICE"
 
         try:
             # Act
-            result = await get_full_account(device_id, preset_repo)
+            result = await get_full_account(device_id, preset_repo, recents_repo)
 
             # Assert
             assert result.status_code == 200
             root = ElementTree.fromstring(result.body.decode())
             assert root.tag == "boseAccount"
         finally:
-            # Cleanup: Close DB connection to prevent hanging
             await preset_repo.close()
+            await recents_repo.close()
 
 
 @pytest.fixture

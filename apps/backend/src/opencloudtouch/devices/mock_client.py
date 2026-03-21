@@ -13,6 +13,7 @@ from opencloudtouch.devices.client import (
     NowPlayingInfo,
     VolumeInfo,
 )
+from opencloudtouch.zones.models import ZoneMemberInfo, ZoneStatus
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,7 @@ class MockDeviceClient(DeviceClient):
         self.ip_address = ip_address
         self._volume = 45
         self._muted = False
+        self._zone: ZoneStatus | None = None
 
         if device_id not in self.MOCK_DEVICES:
             raise ValueError(
@@ -212,3 +214,58 @@ class MockDeviceClient(DeviceClient):
         logger.info(
             f"[MOCK] store_preset({preset_number}, {station_name}) for device {device_id}"
         )
+
+    # ---- Zone Methods ----
+
+    async def get_zone_status(self) -> ZoneStatus | None:
+        """Mock get zone status."""
+        logger.debug(f"[MOCK] get_zone_status() for device {self.device_id}")
+        return self._zone
+
+    async def create_zone(
+        self, master_ip: str, members: list[ZoneMemberInfo]
+    ) -> ZoneStatus:
+        """Mock create zone."""
+        logger.info(f"[MOCK] create_zone() for device {self.device_id}")
+        all_members = [
+            ZoneMemberInfo(
+                device_id=self.device_id, ip_address=master_ip, role="master"
+            )
+        ] + [
+            ZoneMemberInfo(device_id=m.device_id, ip_address=m.ip_address, role="slave")
+            for m in members
+        ]
+        self._zone = ZoneStatus(
+            master_id=self.device_id,
+            master_ip=master_ip,
+            is_master=True,
+            members=all_members,
+        )
+        return self._zone
+
+    async def add_zone_members(self, members: list[ZoneMemberInfo]) -> None:
+        """Mock add zone members."""
+        logger.info(f"[MOCK] add_zone_members() for device {self.device_id}")
+        if self._zone:
+            existing_ids = {m.device_id for m in self._zone.members}
+            for m in members:
+                if m.device_id not in existing_ids:
+                    self._zone.members.append(
+                        ZoneMemberInfo(
+                            device_id=m.device_id, ip_address=m.ip_address, role="slave"
+                        )
+                    )
+
+    async def remove_zone_members(self, members: list[ZoneMemberInfo]) -> None:
+        """Mock remove zone members."""
+        logger.info(f"[MOCK] remove_zone_members() for device {self.device_id}")
+        if self._zone:
+            remove_ids = {m.device_id for m in members}
+            self._zone.members = [
+                m for m in self._zone.members if m.device_id not in remove_ids
+            ]
+
+    async def remove_zone(self) -> None:
+        """Mock remove zone."""
+        logger.info(f"[MOCK] remove_zone() for device {self.device_id}")
+        self._zone = None

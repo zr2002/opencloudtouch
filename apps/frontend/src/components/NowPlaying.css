@@ -1,5 +1,6 @@
 /* Now Playing - Device Card Display */
 .now-playing {
+  position: relative;
   background: linear-gradient(135deg, var(--color-bg-card) 0%, rgba(0, 102, 204, 0.1) 100%);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-xl);
@@ -26,6 +27,7 @@
 }
 
 .np-art {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
   border-radius: var(--border-radius-lg);
@@ -45,6 +47,58 @@
 .np-art-placeholder {
   font-size: 64px;
   opacity: 0.3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* On mobile the play button is always visible — hide placeholder to avoid show-through */
+@media (hover: none), (max-width: 768px) {
+  .np-art-placeholder {
+    visibility: hidden;
+  }
+}
+
+/* Play/Pause overlay button */
+.np-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  min-width: auto;
+  min-height: auto;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Desktop: show on hover */
+.np-art:hover .np-play-overlay {
+  opacity: 1;
+}
+
+/* Mobile: always visible with subtle background */
+@media (hover: none), (max-width: 768px) {
+  .np-play-overlay {
+    opacity: 1;
+  }
+
+  .np-play-overlay svg {
+    background: rgba(0, 0, 0, 0.4);
+  }
+}
+
+.np-play-overlay svg {
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  padding: 12px;
+  width: 56px;
+  height: 56px;
+  box-sizing: content-box;
 }
 
 .np-info {
@@ -80,26 +134,23 @@
   white-space: nowrap;
 }
 
-.np-status {
-  display: flex;
-  justify-content: center;
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--color-border);
-}
-
-.status-icon {
-  width: 48px;
-  height: 48px;
+/* Source mode badge (Bluetooth / Radio) */
+.np-source-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-bg-darker);
-  border-radius: 50%;
-  color: var(--color-text-secondary);
-  font-size: 20px;
+  opacity: 0.7;
 }
 
-.status-icon.playing {
-  background-color: var(--color-accent);
-  color: white;
+.np-source-badge.bluetooth {
+  color: #3b82f6;
+}
+
+.np-source-badge.radio {
+  color: #f59e0b;
 }

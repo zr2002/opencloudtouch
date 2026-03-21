@@ -4,7 +4,8 @@
  * User Story: "Als User möchte ich mehrere Geräte zu einer Zone gruppieren"
  *
  * Test Strategy: Behaviour-driven testing focusing on zone management workflows
- * Coverage: Create Zone, Edit Zone, Dissolve Zone, Device Selection, Validation
+ * Coverage: Create Zone, Edit Zone, Dissolve Zone, Device Selection, Validation,
+ *           Zone Names, NowPlaying, Volume per Member, Master Selection
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
@@ -12,8 +13,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode, HTMLAttributes } from "react";
 import MultiRoom from "../../src/pages/MultiRoom";
+import type { ZoneInfo } from "../../src/api/zones";
 
-// Mock framer-motion
+// ---- Mock framer-motion ----
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: { children: ReactNode } & HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
@@ -23,51 +25,111 @@ vi.mock("framer-motion", () => ({
   AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
+// ---- Mock useZones hook ----
+const mockCreateZone = vi.fn().mockResolvedValue({});
+const mockDissolveZone = vi.fn().mockResolvedValue(undefined);
+const mockAddMembers = vi.fn().mockResolvedValue({});
+const mockRemoveMembers = vi.fn().mockResolvedValue(undefined);
+const mockChangeMaster = vi.fn().mockResolvedValue({});
+const mockRefetch = vi.fn().mockResolvedValue(undefined);
+
+let mockZonesState: { zones: ZoneInfo[]; isLoading: boolean; error: string | null } = {
+  zones: [],
+  isLoading: false,
+  error: null,
+};
+
+vi.mock("../../src/hooks/useZones", () => ({
+  useZones: () => ({
+    ...mockZonesState,
+    createZone: mockCreateZone,
+    dissolveZone: mockDissolveZone,
+    addMembers: mockAddMembers,
+    removeMembers: mockRemoveMembers,
+    changeMaster: mockChangeMaster,
+    refetch: mockRefetch,
+  }),
+}));
+
+// ---- Mock useZoneNames hook ----
+const mockGetZoneName = vi.fn((_, defaultName: string) => defaultName);
+const mockSetZoneName = vi.fn();
+const mockRemoveZoneName = vi.fn();
+
+vi.mock("../../src/hooks/useZoneNames", () => ({
+  useZoneNames: () => ({
+    getZoneName: mockGetZoneName,
+    setZoneName: mockSetZoneName,
+    removeZoneName: mockRemoveZoneName,
+  }),
+}));
+
+// ---- Mock useVolume hook ----
+vi.mock("../../src/hooks/useVolume", () => ({
+  useVolume: () => ({
+    volume: 40,
+    muted: false,
+    loading: false,
+    setDeviceVolume: vi.fn(),
+    toggleMute: vi.fn(),
+  }),
+}));
+
+// ---- Mock useNowPlaying hook ----
+vi.mock("../../src/hooks/useNowPlaying", () => ({
+  useNowPlaying: () => ({
+    nowPlaying: null,
+    loading: false,
+    refresh: vi.fn(),
+  }),
+}));
+
+// ---- Mock VolumeSlider & NowPlaying ----
+vi.mock("../../src/components/VolumeSlider", () => ({
+  default: () => <div data-testid="volume-slider">VolumeSlider</div>,
+}));
+
+vi.mock("../../src/components/NowPlaying", () => ({
+  default: () => <div data-testid="now-playing">NowPlaying</div>,
+}));
+
+// ---- Mock ToastContext ----
+const mockShowToast = vi.fn();
+vi.mock("../../src/contexts/ToastContext", () => ({
+  useToast: () => ({ show: mockShowToast }),
+}));
+
 const mockDevices = [
-  {
-    device_id: "ST10-001",
-    name: "Living Room",
-    model: "SoundTouch 10",
-  },
-  {
-    device_id: "ST30-002",
-    name: "Schlafzimmer",
-    model: "SoundTouch 30",
-  },
-  {
-    device_id: "ST10-003",
-    name: "Küche",
-    model: "SoundTouch 10",
-  },
-  {
-    device_id: "ST300-004",
-    name: "Badezimmer",
-    model: "SoundTouch 300",
-  },
+  { device_id: "ST10-001", name: "Living Room", model: "SoundTouch 10" },
+  { device_id: "ST30-002", name: "Schlafzimmer", model: "SoundTouch 30" },
+  { device_id: "ST10-003", name: "Küche", model: "SoundTouch 10" },
+  { device_id: "ST300-004", name: "Badezimmer", model: "SoundTouch 300" },
 ];
+
+const MOCK_ZONE: ZoneInfo = {
+  master_id: "ST10-001",
+  master_ip: "192.168.1.10",
+  is_master: true,
+  members: [
+    { device_id: "ST10-001", ip_address: "192.168.1.10", role: "master", name: "Living Room" },
+    { device_id: "ST30-002", ip_address: "192.168.1.20", role: "slave", name: "Schlafzimmer" },
+  ],
+};
 
 describe("MultiRoom - Zone Creation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockZonesState = { zones: [], isLoading: false, error: null };
   });
 
-  /**
-   * TEST 1: Empty State - No Devices
-   * User Story: Als User möchte ich wissen wenn keine Geräte verfügbar sind
-   */
   test("should show empty device grid when no devices available", () => {
     render(<MultiRoom devices={[]} />);
 
     expect(screen.getByText(/Multi-Room Zonen/i)).toBeInTheDocument();
     expect(screen.getByText(/Neue Zone erstellen/i)).toBeInTheDocument();
-    // No devices should be shown
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
-  /**
-   * TEST 2: Display Available Devices
-   * User Story: Als User möchte ich alle verfügbaren Geräte sehen
-   */
   test("should display all available devices for selection", () => {
     render(<MultiRoom devices={mockDevices} />);
 
@@ -77,62 +139,43 @@ describe("MultiRoom - Zone Creation", () => {
     expect(screen.getByText("Badezimmer")).toBeInTheDocument();
   });
 
-  /**
-   * TEST 3: Select Devices for Zone
-   * User Story: Als User möchte ich Geräte für eine Zone auswählen
-   */
   test("should allow selecting multiple devices", async () => {
     const user = userEvent.setup();
     render(<MultiRoom devices={mockDevices} />);
 
     const checkboxes = screen.getAllByRole("checkbox");
 
-    // Select first device
     await user.click(checkboxes[0]!);
     expect(checkboxes[0]).toBeChecked();
     expect(screen.getByText(/1 Gerät\(e\) ausgewählt/i)).toBeInTheDocument();
 
-    // Select second device
     await user.click(checkboxes[1]!);
     expect(checkboxes[1]).toBeChecked();
     expect(screen.getByText(/2 Gerät\(e\) ausgewählt/i)).toBeInTheDocument();
   });
 
-  /**
-   * TEST 4: Master/Slave Badge Assignment
-   * User Story: Als User möchte ich sehen welches Gerät Master/Slave ist
-   */
   test("should show master badge on first selected device and slave on others", async () => {
     const user = userEvent.setup();
     render(<MultiRoom devices={mockDevices} />);
 
     const checkboxes = screen.getAllByRole("checkbox");
 
-    // Select first device - should become Master
     await user.click(checkboxes[0]!);
     await waitFor(() => {
-      const labels = screen.getAllByText("Master");
-      expect(labels.length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Master").length).toBeGreaterThan(0);
     });
 
-    // Select second device - should become Slave
     await user.click(checkboxes[1]!);
     await waitFor(() => {
       expect(screen.getByText("Slave")).toBeInTheDocument();
     });
   });
 
-  /**
-   * TEST 5: Validation - Minimum 2 Devices Required
-   * User Story: Als User möchte ich wissen dass mindestens 2 Geräte nötig sind
-   */
   test("should disable create button when less than 2 devices selected", async () => {
     const user = userEvent.setup();
     render(<MultiRoom devices={mockDevices} />);
 
     const checkboxes = screen.getAllByRole("checkbox");
-
-    // Select only 1 device
     await user.click(checkboxes[0]!);
 
     await waitFor(() => {
@@ -142,205 +185,265 @@ describe("MultiRoom - Zone Creation", () => {
     });
   });
 
-  /**
-   * TEST 6: Create Zone Successfully
-   * User Story: Als User möchte ich eine Zone aus 2+ Geräten erstellen
-   */
-  test("should create zone when 2 or more devices selected", async () => {
+  test("should call createZone API when 2+ devices selected and button clicked", async () => {
     const user = userEvent.setup();
     render(<MultiRoom devices={mockDevices} />);
 
     const checkboxes = screen.getAllByRole("checkbox");
-
-    // Select 2 devices
-    await user.click(checkboxes[0]!); // Living Room
-    await user.click(checkboxes[1]!); // Schlafzimmer
+    await user.click(checkboxes[0]!);
+    await user.click(checkboxes[1]!);
 
     const createButton = screen.getByRole("button", { name: /Zone erstellen/i });
     expect(createButton).toBeEnabled();
 
-    // Create zone
     await user.click(createButton);
 
-    // Zone should be created and displayed
-    await waitFor(() => {
-      expect(screen.getByText(/Aktive Zonen/i)).toBeInTheDocument();
-      expect(screen.getByText(/Neue Zone 2/i)).toBeInTheDocument(); // Mock already has 1 zone
-    });
+    expect(mockCreateZone).toHaveBeenCalledWith("ST10-001", ["ST30-002"]);
   });
 
-  /**
-   * TEST 7: Deselect Device
-   * User Story: Als User möchte ich Geräte wieder abwählen können
-   */
   test("should allow deselecting devices", async () => {
     const user = userEvent.setup();
     render(<MultiRoom devices={mockDevices} />);
 
     const checkboxes = screen.getAllByRole("checkbox");
-
-    // Select device
     await user.click(checkboxes[0]!);
     expect(checkboxes[0]).toBeChecked();
 
-    // Deselect device
     await user.click(checkboxes[0]!);
     expect(checkboxes[0]).not.toBeChecked();
-
-    // Selection count should be gone
     expect(screen.queryByText(/Gerät\(e\) ausgewählt/i)).not.toBeInTheDocument();
   });
-});
 
-describe("MultiRoom - Zone Management", () => {
-  /**
-   * TEST 8: Display Existing Zones
-   * User Story: Als User möchte ich meine aktiven Zonen sehen
-   */
-  test("should display existing zones with master and slaves", () => {
-    render(<MultiRoom devices={mockDevices} />);
-
-    expect(screen.getByText(/Aktive Zonen/i)).toBeInTheDocument();
-    expect(screen.getByText(/Living Room Zone/i)).toBeInTheDocument();
-
-    // Should show Master and Slave badges in zone display
-    const zoneBadges = screen.getAllByText("Master");
-    expect(zoneBadges.length).toBeGreaterThan(0);
-  });
-
-  /**
-   * TEST 9: Dissolve Zone
-   * User Story: Als User möchte ich eine Zone auflösen können
-   */
-  test("should dissolve zone when dissolve button clicked", async () => {
-    const user = userEvent.setup();
-    render(<MultiRoom devices={mockDevices} />);
-
-    // Find dissolve button
-    const dissolveButton = screen.getByRole("button", { name: /Auflösen/i });
-
-    // Dissolve zone
-    await user.click(dissolveButton);
-
-    // Zone should be removed
-    await waitFor(() => {
-      expect(screen.queryByText(/Living Room Zone/i)).not.toBeInTheDocument();
-    });
-  });
-
-  /**
-   * TEST 10: Edit Zone
-   * User Story: Als User möchte ich eine bestehende Zone bearbeiten können
-   */
-  test("should allow editing existing zone", async () => {
-    const user = userEvent.setup();
-    render(<MultiRoom devices={mockDevices} />);
-
-    // Click edit button
-    const editButton = screen.getByRole("button", { name: /Bearbeiten/i });
-    await user.click(editButton);
-
-    // Should show edit mode
-    await waitFor(() => {
-      expect(screen.getByText(/Zone bearbeiten: Living Room Zone/i)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Zone aktualisieren/i })).toBeInTheDocument();
-    });
-  });
-
-  /**
-   * TEST 11: Devices in Zone Should Be Disabled
-   * User Story: Als User möchte ich nicht versehentlich Geräte aus anderen Zonen hinzufügen
-   */
-  test("should disable devices that are already in a zone", async () => {
-    const user = userEvent.setup();
-    render(<MultiRoom devices={mockDevices} />);
-
-    // Create a zone first
-    const checkboxes = screen.getAllByRole("checkbox");
-    await user.click(checkboxes[2]!); // Küche
-    await user.click(checkboxes[3]!); // Badezimmer
-
-    const createButton = screen.getByRole("button", { name: /Zone erstellen/i });
-    await user.click(createButton);
-
-    // Now those devices should be disabled and show "In Zone" badge
-    await waitFor(() => {
-      const inZoneBadges = screen.getAllByText("In Zone");
-      expect(inZoneBadges.length).toBeGreaterThan(0);
-    });
-  });
-});
-
-describe("MultiRoom - Edge Cases", () => {
-  /**
-   * TEST 12: Clear Selection After Zone Creation
-   * User Story: Als User möchte ich nach Zonen-Erstellung eine neue Auswahl treffen
-   */
-  test("should clear device selection after creating zone", async () => {
+  test("should clear selection after successful zone creation", async () => {
     const user = userEvent.setup();
     render(<MultiRoom devices={mockDevices} />);
 
     const checkboxes = screen.getAllByRole("checkbox");
-
-    // Select devices
     await user.click(checkboxes[2]!);
     await user.click(checkboxes[3]!);
 
-    // Create zone
     const createButton = screen.getByRole("button", { name: /Zone erstellen/i });
     await user.click(createButton);
 
-    // Selection should be cleared
     await waitFor(() => {
       expect(checkboxes[2]).not.toBeChecked();
       expect(checkboxes[3]).not.toBeChecked();
       expect(screen.queryByText(/Gerät\(e\) ausgewählt/i)).not.toBeInTheDocument();
     });
   });
+});
 
-  /**
-   * TEST 13: Zone with Unknown Devices (Defensive)
-   * User Story: Als System sollte ich gracefully mit fehlenden Geräten umgehen
-   */
-  test("should handle zone with devices not in device list", () => {
-    // Mock zone references devices not in mockDevices
-    render(<MultiRoom devices={mockDevices} />);
-
-    // Should show "Unknown Device" for missing devices
-    expect(screen.queryByText(/Unknown Device/i)).toBeInTheDocument();
+describe("MultiRoom - Zone Display", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockZonesState = { zones: [MOCK_ZONE], isLoading: false, error: null };
   });
 
-  /**
-   * TEST 14: Multiple Zone Creation
-   * User Story: Als User möchte ich mehrere unabhängige Zonen erstellen können
-   */
-  test("should allow creating multiple independent zones", async () => {
+  test("should display existing zones with master and slaves", () => {
+    render(<MultiRoom devices={mockDevices} />);
+
+    expect(screen.getByText(/Aktive Zonen/i)).toBeInTheDocument();
+    const masterBadges = screen.getAllByText("Master");
+    expect(masterBadges.length).toBeGreaterThan(0);
+    const slaveBadges = screen.getAllByText("Slave");
+    expect(slaveBadges.length).toBeGreaterThan(0);
+  });
+
+  test("should show volume slider per zone member", () => {
+    render(<MultiRoom devices={mockDevices} />);
+
+    const sliders = screen.getAllByTestId("volume-slider");
+    expect(sliders.length).toBe(2); // master + 1 slave
+  });
+
+  test("should show now-playing section in zone card", () => {
+    render(<MultiRoom devices={mockDevices} />);
+
+    // NowPlaying returns null → shows standby
+    expect(screen.getByText("Standby")).toBeInTheDocument();
+  });
+
+  test("should show zone name from useZoneNames", () => {
+    mockGetZoneName.mockReturnValue("Mein Wohnzimmer");
+    render(<MultiRoom devices={mockDevices} />);
+
+    expect(screen.getByText("Mein Wohnzimmer")).toBeInTheDocument();
+  });
+});
+
+describe("MultiRoom - Zone Management", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockZonesState = { zones: [MOCK_ZONE], isLoading: false, error: null };
+  });
+
+  test("should require confirmation before dissolving zone", async () => {
     const user = userEvent.setup();
     render(<MultiRoom devices={mockDevices} />);
 
-    // Already has 1 mock zone, create another
-    const checkboxes = screen.getAllByRole("checkbox");
+    const dissolveButton = screen.getByRole("button", { name: /Auflösen/i });
+    await user.click(dissolveButton);
 
-    // Create first new zone
-    await user.click(checkboxes[2]!);
-    await user.click(checkboxes[3]!);
+    // Should show confirmation
+    expect(screen.getByRole("button", { name: /Wirklich auflösen/i })).toBeInTheDocument();
+  });
+
+  test("should call dissolveZone API on confirmation", async () => {
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const dissolveButton = screen.getByRole("button", { name: /Auflösen/i });
+    await user.click(dissolveButton);
+
+    const confirmButton = screen.getByRole("button", { name: /Wirklich auflösen/i });
+    await user.click(confirmButton);
+
+    expect(mockDissolveZone).toHaveBeenCalledWith("ST10-001");
+    expect(mockRemoveZoneName).toHaveBeenCalledWith("ST10-001");
+  });
+
+  test("should allow editing existing zone", async () => {
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const editButton = screen.getByRole("button", { name: /Bearbeiten/i });
+    await user.click(editButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Zone bearbeiten/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Zone aktualisieren/i })).toBeInTheDocument();
+    });
+  });
+
+  test("should show cancel button in edit mode", async () => {
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const editButton = screen.getByRole("button", { name: /Bearbeiten/i });
+    await user.click(editButton);
+
+    expect(screen.getByRole("button", { name: /Abbrechen/i })).toBeInTheDocument();
+  });
+
+  test("should disable devices already in a different zone", () => {
+    render(<MultiRoom devices={mockDevices} />);
+
+    // ST10-001 and ST30-002 are in zone → In Zone badge
+    const inZoneBadges = screen.getAllByText("In Zone");
+    expect(inZoneBadges.length).toBeGreaterThan(0);
+  });
+});
+
+describe("MultiRoom - Master Selection (STORY-1011)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockZonesState = { zones: [], isLoading: false, error: null };
+  });
+
+  test("should show set-master button on slave devices", async () => {
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    await user.click(checkboxes[0]!);
+    await user.click(checkboxes[1]!);
+
+    // Slave should have ★ button
+    expect(screen.getByTitle("Als Master setzen")).toBeInTheDocument();
+  });
+
+  test("should swap master when set-master button clicked", async () => {
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    await user.click(checkboxes[0]!); // ST10-001 = Master
+    await user.click(checkboxes[1]!); // ST30-002 = Slave
+
+    const setMasterBtn = screen.getByTitle("Als Master setzen");
+    await user.click(setMasterBtn);
+
+    // Now create zone - ST30-002 should be first (master)
     const createButton = screen.getByRole("button", { name: /Zone erstellen/i });
     await user.click(createButton);
 
-    // Should now have 2 zones total
-    await waitFor(() => {
-      const zoneCards = screen.getAllByText(/Zone/i);
-      // At least 2 zone mentions (title + zone names)
-      expect(zoneCards.length).toBeGreaterThanOrEqual(2);
-    });
+    expect(mockCreateZone).toHaveBeenCalledWith("ST30-002", ["ST10-001"]);
+  });
+});
+
+describe("MultiRoom - Zone Name Editing (STORY-1009)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetZoneName.mockImplementation((_, defaultName: string) => defaultName);
+    mockZonesState = { zones: [MOCK_ZONE], isLoading: false, error: null };
+  });
+
+  test("should show editable zone name button", () => {
+    render(<MultiRoom devices={mockDevices} />);
+
+    const nameButton = screen.getByTitle("Klick zum Bearbeiten");
+    expect(nameButton).toBeInTheDocument();
+  });
+
+  test("should switch to input on zone name click", async () => {
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const nameButton = screen.getByTitle("Klick zum Bearbeiten");
+    await user.click(nameButton);
+
+    const input = screen.getByRole("textbox", { name: /Zone-Name bearbeiten/i });
+    expect(input).toBeInTheDocument();
+  });
+
+  test("should save zone name on Enter", async () => {
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const nameButton = screen.getByTitle("Klick zum Bearbeiten");
+    await user.click(nameButton);
+
+    const input = screen.getByRole("textbox", { name: /Zone-Name bearbeiten/i });
+    await user.clear(input);
+    await user.type(input, "Mein Wohnzimmer{Enter}");
+
+    expect(mockSetZoneName).toHaveBeenCalledWith("ST10-001", "Mein Wohnzimmer");
+  });
+});
+
+describe("MultiRoom - Loading & Error States", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test("should show loading state", () => {
+    mockZonesState = { zones: [], isLoading: true, error: null };
+    render(<MultiRoom devices={mockDevices} />);
+
+    expect(screen.getByText(/Lade Zonen/i)).toBeInTheDocument();
+  });
+
+  test("should show error state", () => {
+    mockZonesState = { zones: [], isLoading: false, error: "Network Error" };
+    render(<MultiRoom devices={mockDevices} />);
+
+    expect(screen.getByText(/Fehler beim Laden/i)).toBeInTheDocument();
+    expect(screen.getByText("Network Error")).toBeInTheDocument();
+  });
+
+  test("should show empty state when no zones exist", () => {
+    mockZonesState = { zones: [], isLoading: false, error: null };
+    render(<MultiRoom devices={mockDevices} />);
+
+    expect(screen.getByText(/Keine aktiven Zonen/i)).toBeInTheDocument();
   });
 });
 
 describe("MultiRoom - User Guidance", () => {
-  /**
-   * TEST 15: Info Box Displayed
-   * User Story: Als User möchte ich Hilfe zur Multi-Room Funktion sehen
-   */
+  beforeEach(() => {
+    mockZonesState = { zones: [], isLoading: false, error: null };
+  });
+
   test("should display info box with multi-room hints", () => {
     render(<MultiRoom devices={mockDevices} />);
 
@@ -351,5 +454,141 @@ describe("MultiRoom - User Guidance", () => {
     expect(
       screen.getByText(/Lautstärke kann pro Gerät individuell angepasst werden/i)
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Klicke auf den Zonen-Namen um ihn zu ändern/i)
+    ).toBeInTheDocument();
+  });
+});
+
+describe("MultiRoom - Toast Notifications (STORY-1008)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockZonesState = { zones: [], isLoading: false, error: null };
+  });
+
+  test("should show success toast on zone creation", async () => {
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    await user.click(checkboxes[0]!);
+    await user.click(checkboxes[1]!);
+
+    const createButton = screen.getByRole("button", { name: /Zone erstellen/i });
+    await user.click(createButton);
+
+    await waitFor(() => {
+      expect(mockShowToast).toHaveBeenCalledWith("Zone erstellt", "success");
+    });
+  });
+
+  test("should show error toast on zone creation failure", async () => {
+    mockCreateZone.mockRejectedValueOnce(new Error("Network error"));
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    await user.click(checkboxes[0]!);
+    await user.click(checkboxes[1]!);
+
+    const createButton = screen.getByRole("button", { name: /Zone erstellen/i });
+    await user.click(createButton);
+
+    await waitFor(() => {
+      expect(mockShowToast).toHaveBeenCalledWith("Zone konnte nicht erstellt werden", "error");
+    });
+  });
+
+  test("should show success toast on zone dissolve", async () => {
+    mockZonesState = { zones: [MOCK_ZONE], isLoading: false, error: null };
+    const user = userEvent.setup();
+    render(<MultiRoom devices={mockDevices} />);
+
+    const dissolveButton = screen.getByRole("button", { name: /Auflösen/i });
+    await user.click(dissolveButton);
+
+    const confirmButton = screen.getByRole("button", { name: /Wirklich auflösen/i });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(mockShowToast).toHaveBeenCalledWith("Zone aufgelöst", "success");
+    });
+  });
+});
+
+describe("MultiRoom - 5+ Device Zone Display", () => {
+  const fiveDevices = [
+    { device_id: "D001", name: "Wohnzimmer", model: "SoundTouch 30" },
+    { device_id: "D002", name: "Küche", model: "SoundTouch 10" },
+    { device_id: "D003", name: "Schlafzimmer", model: "SoundTouch 10" },
+    { device_id: "D004", name: "Bad", model: "SoundTouch 300" },
+    { device_id: "D005", name: "Büro", model: "SoundTouch 20" },
+  ];
+
+  const fiveMemberZone: ZoneInfo = {
+    master_id: "D001",
+    master_ip: "192.168.1.10",
+    is_master: true,
+    members: [
+      { device_id: "D001", ip_address: "192.168.1.10", role: "master", name: "Wohnzimmer" },
+      { device_id: "D002", ip_address: "192.168.1.11", role: "slave", name: "Küche" },
+      { device_id: "D003", ip_address: "192.168.1.12", role: "slave", name: "Schlafzimmer" },
+      { device_id: "D004", ip_address: "192.168.1.13", role: "slave", name: "Bad" },
+      { device_id: "D005", ip_address: "192.168.1.14", role: "slave", name: "Büro" },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test("should display all 5 zone members with correct badges", () => {
+    mockZonesState = { zones: [fiveMemberZone], isLoading: false, error: null };
+    render(<MultiRoom devices={fiveDevices} />);
+
+    // All 5 device names visible in zone display
+    expect(screen.getAllByText("Wohnzimmer").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Küche").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Schlafzimmer").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Bad").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Büro").length).toBeGreaterThanOrEqual(1);
+
+    // 1 Master badge + 4 Slave badges in zone
+    const masterBadges = screen.getAllByText("Master");
+    const slaveBadges = screen.getAllByText("Slave");
+    expect(masterBadges.length).toBeGreaterThanOrEqual(1);
+    expect(slaveBadges.length).toBeGreaterThanOrEqual(4);
+  });
+
+  test("should render volume slider for each of 5 zone members", () => {
+    mockZonesState = { zones: [fiveMemberZone], isLoading: false, error: null };
+    render(<MultiRoom devices={fiveDevices} />);
+
+    const volumeSliders = screen.getAllByTestId("volume-slider");
+    expect(volumeSliders.length).toBe(5);
+  });
+
+  test("should select all 5 devices and create zone", async () => {
+    mockZonesState = { zones: [], isLoading: false, error: null };
+    const user = userEvent.setup();
+    render(<MultiRoom devices={fiveDevices} />);
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes.length).toBe(5);
+
+    for (const cb of checkboxes) {
+      await user.click(cb);
+    }
+
+    await waitFor(() => {
+      expect(screen.getByText(/5 Gerät\(e\) ausgewählt/i)).toBeInTheDocument();
+    });
+
+    const createButton = screen.getByRole("button", { name: /Zone erstellen/i });
+    expect(createButton).toBeEnabled();
+
+    await user.click(createButton);
+
+    expect(mockCreateZone).toHaveBeenCalledWith("D001", ["D002", "D003", "D004", "D005"]);
   });
 });
