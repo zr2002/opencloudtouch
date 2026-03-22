@@ -598,25 +598,25 @@ jobs:
 
       - name: Parse coverage and generate summary
         run: |
-          echo "# Ã°Å¸â€œÅ  CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "# 📊 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Job status overview
-          echo "## Ã°Å¸â€Â Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔍 Job Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Security Scan | ${{ needs.security.result == 'success' && 'Ã¢Å“â€¦ Passed' || 'Ã¢ÂÅ’ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Format Check | ${{ needs.format.result == 'success' && 'Ã¢Å“â€¦ Passed' || 'Ã¢ÂÅ’ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Lint | ${{ needs.lint.result == 'success' && 'Ã¢Å“â€¦ Passed' || 'Ã¢ÂÅ’ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend Tests | ${{ needs.backend-tests.result == 'success' && 'Ã¢Å“â€¦ Passed' || 'Ã¢ÂÅ’ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend Tests | ${{ needs.frontend-tests.result == 'success' && 'Ã¢Å“â€¦ Passed' || 'Ã¢ÂÅ’ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| E2E Tests | ${{ needs.e2e-tests.result == 'success' && 'Ã¢Å“â€¦ Passed' || 'Ã¢ÂÅ’ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Container Scan | ${{ needs.container-scan.result == 'success' && 'Ã¢Å“â€¦ Passed' || needs.container-scan.result == 'skipped' && 'Ã¢ÂÂ­Ã¯Â¸Â Skipped' || 'Ã¢ÂÅ’ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Format Check | ${{ needs.format.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Tests | ${{ needs.backend-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Tests | ${{ needs.frontend-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.e2e-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Scan | ${{ needs.container-scan.result == 'success' && '✅ Passed' || needs.container-scan.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Coverage
-          echo "## Ã°Å¸â€œË† Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "## 📈 Test Coverage" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Backend coverage
@@ -636,7 +636,7 @@ jobs:
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Ã°Å¸â€™Â¡ Tip: Click on job names above to see detailed results_" >> $GITHUB_STEP_SUMMARY
+          echo "_💡 Tip: Click on job names above to see detailed results_" >> $GITHUB_STEP_SUMMARY
 
       - name: Check overall status
         run: |
@@ -646,8 +646,8 @@ jobs:
              [[ "${{ needs.backend-tests.result }}" != "success" ]] || \
              [[ "${{ needs.frontend-tests.result }}" != "success" ]] || \
              [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
-            echo "Ã¢ÂÅ’ Some jobs failed - see summary above" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Some jobs failed - see summary above" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
-            echo "Ã¢Å“â€¦ All jobs passed successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All jobs passed successfully!" >> $GITHUB_STEP_SUMMARY
           fi
