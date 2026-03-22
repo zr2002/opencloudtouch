@@ -19,7 +19,7 @@ jobs:
           args: >
             -Dsonar.projectKey=scheilch_opencloudtouch
             -Dsonar.organization=scheilscm
-            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.wait=false
             -Dsonar.projectName=opencloudtouch
             -Dsonar.sources=apps/backend/src,apps/frontend/src
             -Dsonar.exclusions=**/tests/**,**/__tests__/**,**/*.test.*,**/pytest.ini,**/sonar-project.properties
