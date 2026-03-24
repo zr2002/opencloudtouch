@@ -1,280 +1,196 @@
 # OpenCloudTouch (OCT)
 
-**OpenCloudTouch** ist eine lokale Open-Source-Loesung fuer **Bose®-Geräte der SoundTouch®-Serie** nach dem Cloud-Ende.
+**OpenCloudTouch** is a local, open-source solution for **Bose® SoundTouch® speakers** after the official cloud shutdown.
 
-Ziel: SoundTouch®-Lautsprecher (z. B. SoundTouch® 10/30/300) weiter nutzen, ohne Bose®-Cloud und ohne proprietaere App.
+Keep your SoundTouch® speakers (e.g. SoundTouch® 10/30/300) running — without the Bose® cloud, without the proprietary app. One container, one web app, full local control.
 
-> 📖 **Vollständige Dokumentation**: [GitHub Wiki](https://github.com/scheilch/opencloudtouch/wiki)
+> **Trademark Notice:** OpenCloudTouch is not affiliated with Bose® Corporation. Bose® and SoundTouch® are registered trademarks of Bose® Corporation. See [NOTICE](NOTICE).
 
-> Leitidee: Ein Container, eine Web-App, lokale Steuerung.
-
-**Trademark Notice**: OpenCloudTouch (OCT) is not affiliated with Bose® Corporation. Bose® and SoundTouch® are registered trademarks of Bose® Corporation. See `NOTICE`.
+| | |
+|---|---|
+| **Documentation** | [GitHub Wiki](https://github.com/scheilch/opencloudtouch/wiki) (Deutsch / English) |
+| **Discussions** | [GitHub Discussions](https://github.com/scheilch/opencloudtouch/discussions) |
+| **Releases** | [GitHub Releases](https://github.com/scheilch/opencloudtouch/releases) |
 
 ## Features
 
-- Internetradio und Presets (1-6)
-- Web-UI fuer Desktop und Smartphone
-- Device Discovery via SSDP/UPnP + manuelle IP-Fallbacks
-- Preset-Programmierung inkl. lokaler Descriptor-/Playlist-Endpunkte
-- Setup-Wizard fuer manuelle Geraetekonfiguration (via SSH/USB)
-- BMX-kompatible Endpunkte fuer SoundTouch® (inkl. TuneIn-Resolver-Route)
-- Docker-Deployment (amd64 + arm64)
+- Internet radio with preset support (1–6 hardware buttons)
+- Responsive web UI for desktop and mobile
+- Device discovery via SSDP/UPnP + manual IP fallbacks
+- Preset programming with local descriptor and playlist endpoints
+- Setup wizard for manual device configuration (SSH/USB)
+- Multi-room zone management
+- BMX-compatible endpoints for SoundTouch® (including TuneIn stream resolver)
+- Docker deployment on three architectures (amd64, arm64, arm/v7)
+- Pre-built Raspberry Pi SD card images
 
-## Architektur (Kurzfassung)
+## Architecture
 
 ```text
 Browser UI
-   ->
-OpenCloudTouch (FastAPI + React, im Container)
-   ->
-SoundTouch® Geraete im lokalen Netzwerk (HTTP/WebSocket)
+   →
+OpenCloudTouch (FastAPI + React, single container)
+   →
+SoundTouch® devices on the local network (HTTP / WebSocket)
 ```
 
-Radio-Provider sind per Adapter abstrahiert. Aktuell ist RadioBrowser integriert.
+Radio providers are abstracted via adapters. RadioBrowser is the built-in search provider; TuneIn is supported as a stream resolver for existing device presets.
 
-## Installation & Quickstart
+## Quick Start
 
-### Option 1: Docker Compose (empfohlen)
-
-1. Repository klonen:
+### Option 1 — Docker Compose (recommended)
 
 ```bash
 git clone https://github.com/scheilch/opencloudtouch.git
 cd opencloudtouch
-```
-
-2. Container starten:
-
-```bash
 docker compose -f deployment/docker-compose.yml up -d --build
 ```
 
-3. Web-UI oeffnen:
-
-```text
-http://localhost:7777
-```
-
-4. Logs:
+Open **http://localhost:7777** in your browser.
 
 ```bash
+# View logs
 docker compose -f deployment/docker-compose.yml logs -f
-```
 
-5. Stoppen:
-
-```bash
+# Stop
 docker compose -f deployment/docker-compose.yml down
 ```
 
-### Option 2: Docker Run (GHCR Image)
+### Option 2 — Docker Run (GHCR)
 
 ```bash
-# Latest stable release (recommended)
 docker run -d \
   --name opencloudtouch \
   --network host \
   -v opencloudtouch-data:/data \
   -e OCT_DISCOVERY_ENABLED=true \
   ghcr.io/scheilch/opencloudtouch:stable
-
-# Or a specific version
-docker pull ghcr.io/scheilch/opencloudtouch:1.0.0
 ```
 
-### Available Docker Tags
+### Option 3 — Raspberry Pi (SD Card Image)
+
+Pre-built images for Raspberry Pi 3/4/5 are available on the [Releases page](https://github.com/scheilch/opencloudtouch/releases).
+
+1. Download the `.img.xz` for your board
+2. Flash with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+3. Boot — OpenCloudTouch starts automatically on port 7777
+4. Default login: `oct` / `opencloudtouch`
+
+### Docker Tags
 
 | Tag | Description |
 |-----|-------------|
 | `stable` | Latest stable release (recommended) |
-| `1.0.0` | Specific version |
-| `latest` | Latest build from main (may be unstable) |
-| `1.0` | Latest patch of minor version |
+| `1.1.0` | Specific version |
+| `latest` | Latest build from `main` (may be unstable) |
+| `1.1` | Latest patch of minor version |
 
 ### Supported Architectures
 
 | Arch | Platform | Devices |
 |------|----------|---------|
-| `amd64` | x86_64 | Desktop, Server, NAS |
+| `amd64` | x86_64 | Desktop, server, NAS |
 | `arm64` | aarch64 | Raspberry Pi 4/5, Apple Silicon |
 | `arm/v7` | armhf | Raspberry Pi 2/3 |
 
-### Option 3: Raspberry Pi (SD-Card Image)
-
-Pre-built SD card images for Raspberry Pi 3/4/5 are available on the [Releases page](https://github.com/scheilch/opencloudtouch/releases).
-
-1. Download `.img.xz` for your architecture
-2. Flash with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
-3. Boot → OpenCloudTouch starts automatically on port 7777
-4. Default login: `oct` / `opencloudtouch`
-
-## Projekt-Struktur
+## Project Structure
 
 ```text
 opencloudtouch/
-|- .github/                         # CI/CD, codecov, CONTRIBUTING, SECURITY
-|- apps/
-|  |- backend/
-|  |  |- src/opencloudtouch/        # FastAPI Backend
-|  |  |- tests/                     # Unit/Integration/E2E/Real Tests
-|  |  |- pyproject.toml             # inkl. pytest + coverage + ruff Config
-|  |  |- requirements.txt
-|  |  `- requirements-dev.txt
-|  `- frontend/
-|     |- src/                       # React + TypeScript
-|     |- tests/
-|     `- package.json
-|- deployment/
-|  |- Dockerfile
-|  |- docker-compose.yml
-|  |- config.example.yaml           # Backend-Konfigurationsvorlage
-|  |- .env.template                 # Env-Variablen-Vorlage
-|  |- raspi-image/                  # RPi SD-Card Image Build
-|  `- local/                       # PowerShell Deploy/Utility Scripts
-|- scripts/
-|  |- e2e-runner.mjs
-|  |- hooks/                        # Pre-commit hook scripts
-|  |- install-hooks.ps1
-|  `- install-hooks.sh
-|- package.json                     # Workspaces, commitlint, prettier
-`- README.md
+├── apps/
+│   ├── backend/                  # FastAPI REST API (Python 3.11+)
+│   │   ├── src/opencloudtouch/
+│   │   └── tests/
+│   └── frontend/                 # React + TypeScript (Vite 8)
+│       ├── src/
+│       └── tests/
+├── deployment/
+│   ├── Dockerfile                # Multi-stage production build
+│   ├── docker-compose.yml
+│   └── raspi-image/              # Raspberry Pi SD card build
+├── scripts/                      # Git hooks, E2E runner
+└── package.json                  # Monorepo root (npm workspaces)
 ```
 
-## Lokale Entwicklung
+## Local Development
 
-### Voraussetzungen
+### Prerequisites
 
-- Node.js >= 20
-- npm >= 10
+- Node.js >= 20, npm >= 10
 - Python >= 3.11
 
-### Quick Start (Root)
+### Setup
 
 ```bash
-# Node dependencies
+# Install Node dependencies
 npm install
 
-# Python venv + backend deps
+# Create Python venv and install backend
 python -m venv .venv
-.venv\Scripts\activate   # Windows
-# source .venv/bin/activate  # Linux/macOS
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux / macOS
 pip install -e apps/backend
 pip install -r apps/backend/requirements-dev.txt
 
-# Backend + Frontend parallel starten
+# Start backend + frontend in parallel
 npm run dev
 ```
 
-- Backend: `http://localhost:7777`
-- Frontend (Vite dev): `http://localhost:5175`
+- Backend: http://localhost:7777
+- Frontend dev server: http://localhost:5175
 
-### Backend manuell starten
-
-```bash
-python -m opencloudtouch
-```
-
-Alternative mit Uvicorn:
+### Running Tests
 
 ```bash
-uvicorn opencloudtouch.main:app --reload --host 0.0.0.0 --port 7777
+npm test                # All tests (backend + frontend + E2E)
+npm run test:backend    # Backend unit tests with coverage
+npm run test:frontend   # Frontend unit tests
+npm run test:e2e        # Cypress E2E tests
+npm run lint            # Linting (Ruff + ESLint)
 ```
 
-## Tests
+## Configuration
 
-### Empfohlen (Root)
+Configuration uses `OCT_` environment variables. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full reference.
 
-```bash
-npm test
-npm run test:backend
-npm run test:frontend
-npm run test:e2e
-npm run lint
-```
-
-### Direkt in den Workspaces
-
-```bash
-# Backend
-cd apps/backend
-pytest -v --cov=opencloudtouch --cov-report=html
-pytest tests/unit/radio/providers/test_radiobrowser.py -v
-
-# Frontend
-cd apps/frontend
-npm test
-npm run test:coverage
-npm run test:e2e:open
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OCT_HOST` | `0.0.0.0` | API bind address |
+| `OCT_PORT` | `7777` | API port |
+| `OCT_LOG_LEVEL` | `INFO` | Log level |
+| `OCT_DB_PATH` | `/data/oct.db` | SQLite database path |
+| `OCT_DISCOVERY_ENABLED` | `true` | Enable SSDP discovery |
+| `OCT_DISCOVERY_TIMEOUT` | `5` | Discovery timeout (seconds) |
+| `OCT_MANUAL_DEVICE_IPS` | `""` | Comma-separated fallback IPs |
 
 ## Troubleshooting
 
-### Container startet nicht
+| Problem | Solution |
+|---------|----------|
+| Container won't start | `docker compose -f deployment/docker-compose.yml logs opencloudtouch` |
+| Devices not found | Ensure `network_mode: host` and same network; use `OCT_MANUAL_DEVICE_IPS` as fallback |
+| Port 7777 in use | `OCT_PORT=8080 docker compose -f deployment/docker-compose.yml up -d` |
+| Health check | `docker exec opencloudtouch python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:7777/health').status)"` |
 
-```bash
-docker compose -f deployment/docker-compose.yml logs opencloudtouch
-```
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for more details.
 
-### Health-Check im Container testen
+## Roadmap
 
-```bash
-docker exec opencloudtouch python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:7777/health').status)"
-```
+- Spotify integration (OAuth / token handling)
+- Additional providers (Apple Music, Deezer, Music Assistant)
 
-### Geraete werden nicht gefunden
+## Contributing
 
-- `network_mode: host` verwenden (in `deployment/docker-compose.yml` bereits gesetzt)
-- Geraete und OCT muessen im selben Netzwerk sein
-- Fallback ueber `OCT_MANUAL_DEVICE_IPS` nutzen
+Contributions are welcome! See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
 
-### Port 7777 ist belegt
+- [Conventional Commits](docs/CONVENTIONAL_COMMITS.md) are required
+- Minimum 80% test coverage
+- Pre-commit hooks enforce formatting and linting
 
-```bash
-OCT_PORT=8080 docker compose -f deployment/docker-compose.yml up -d
-```
+## Community
 
-## Konfiguration
+Join the conversation in [GitHub Discussions](https://github.com/scheilch/opencloudtouch/discussions) — ask questions, share your setup, or suggest features.
 
-Aktuell erfolgt die Konfiguration primär ueber `OCT_`-Umgebungsvariablen.
+## License
 
-- Beispielwerte: `deployment/.env.template`
-- Vollstaendige Referenz: `deployment/config.example.yaml` und `docs/CONFIGURATION.md`
-
-Wichtige Variablen:
-
-| Variable | Default | Beschreibung |
-|----------|---------|--------------|
-| `OCT_HOST` | `0.0.0.0` | API Bind-Adresse |
-| `OCT_PORT` | `7777` | API Port |
-| `OCT_LOG_LEVEL` | `INFO` | Log-Level |
-| `OCT_DB_PATH` | `/data/oct.db` | SQLite-Pfad (Produktivbetrieb) |
-| `OCT_DISCOVERY_ENABLED` | `true` | Discovery aktivieren |
-| `OCT_DISCOVERY_TIMEOUT` | `5` | Discovery-Timeout in Sekunden |
-| `OCT_MANUAL_DEVICE_IPS` | `""` | Komma-separierte manuelle IPs |
-
-## Aktueller Stand
-
-Bereits umgesetzt (Codebasis):
-
-- Discovery/Sync fuer Geraete (`/api/devices/discover`, `/api/devices/sync`)
-- RadioBrowser-Suche (`/api/radio/search`)
-- Preset-Verwaltung (`/api/presets/...`) inkl. Station-Descriptor/Playlist-Routen
-- Key-Press Endpoint fuer Preset-Tests (`/api/devices/{device_id}/key`)
-- Setup-Wizard API (`/api/setup/...`)
-- BMX-Routen fuer SoundTouch®-Kompatibilitaet (inkl. TuneIn-Playback-Route)
-- LOCAL_INTERNET_RADIO Playback via Orion-Adapter (siehe [docs/PRESET_PLAYBACK.md](docs/PRESET_PLAYBACK.md))
-- Frontend-Seiten fuer Radio, Presets, Firmware, Settings
-
-Offen bzw. in Planung:
-
-- Spotify-Integration (OAuth/Token-Handling)
-- weitere Provider (Apple Music, Deezer, Music Assistant)
-- rechtliche/ToS-Klaerung je Provider
-
-## Mitmachen
-
-Beitraege sind willkommen. Siehe `.github/CONTRIBUTING.md`.
-
-## Lizenz
-
-Apache License 2.0. Siehe `LICENSE` und `NOTICE`.
+[Apache License 2.0](LICENSE) — see [NOTICE](NOTICE) for trademark details.
