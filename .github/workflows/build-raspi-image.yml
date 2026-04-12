@@ -1,6 +1,8 @@
 name: Build Raspberry Pi Images
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       oct_version:
@@ -39,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: ${{ fromJSON(inputs.architectures == 'all' && '["arm64", "armhf"]' || format('["{0}"]', inputs.architectures)) }}
+        arch: ${{ fromJSON((inputs.architectures || 'all') == 'all' && '["arm64", "armhf"]' || format('["{0}"]', inputs.architectures)) }}
 
     steps:
       - name: Checkout code
@@ -106,8 +108,13 @@ jobs:
           mkdir -p pi-gen/stage-opencloudtouch/01-configure-oct/files
           cp deployment/raspi-image/files/* pi-gen/stage-opencloudtouch/01-configure-oct/files/
 
-          # Set OCT version in compose file
-          OCT_VERSION="${{ inputs.oct_version || 'latest' }}"
+          # Set OCT version in compose file (release event: extract from tag)
+          if [ "${{ github.event_name }}" = "release" ]; then
+            OCT_VERSION="${{ github.event.release.tag_name }}"
+            OCT_VERSION="${OCT_VERSION#v}"  # strip 'v' prefix
+          else
+            OCT_VERSION="${{ inputs.oct_version || 'latest' }}"
+          fi
           if [ "$OCT_VERSION" != "latest" ]; then
             sed -i "s|ghcr.io/scheilch/opencloudtouch:latest|ghcr.io/scheilch/opencloudtouch:${OCT_VERSION}|g" \
               pi-gen/stage-opencloudtouch/01-configure-oct/files/docker-compose.yml
@@ -216,7 +223,13 @@ jobs:
       - name: Compress and checksum image
         id: image
         run: |
-          OCT_VERSION="${{ inputs.oct_version || 'latest' }}"
+          # Determine version (release event: extract from tag)
+          if [ "${{ github.event_name }}" = "release" ]; then
+            OCT_VERSION="${{ github.event.release.tag_name }}"
+            OCT_VERSION="${OCT_VERSION#v}"  # strip 'v' prefix
+          else
+            OCT_VERSION="${{ inputs.oct_version || 'latest' }}"
+          fi
 
           # Find the built image (may be inside a ZIP)
           IMG_FILE=$(find pi-gen/deploy -name "*.img" -type f | head -1)
@@ -273,7 +286,7 @@ jobs:
     name: Attach to Release
     runs-on: ubuntu-latest
     needs: build-image
-    if: inputs.attach_to_release
+    if: github.event_name == 'release' || inputs.attach_to_release
 
     permissions:
       contents: write
@@ -286,13 +299,17 @@ jobs:
           path: images
           merge-multiple: true
 
-      - name: Get latest release
+      - name: Get release tag
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases/latest \
-            --jq '.tag_name' 2>/dev/null || echo "")
+          if [ "${{ github.event_name }}" = "release" ]; then
+            RELEASE_TAG="${{ github.event.release.tag_name }}"
+          else
+            RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases/latest \
+              --jq '.tag_name' 2>/dev/null || echo "")
+          fi
 
           if [ -z "$RELEASE_TAG" ]; then
             echo "::error::No release found to attach images to."
