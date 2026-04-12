@@ -1,5 +1,11 @@
 # OpenCloudTouch (OCT)
 
+> ## ⚠️ DISCLAIMER — USE AT YOUR OWN RISK / NUTZUNG AUF EIGENE GEFAHR
+>
+> This software modifies your Bose® SoundTouch® device configuration. **The authors accept no liability whatsoever for any damage, malfunction, or permanent failure ("bricking") of your devices.** Use is entirely at your own risk. See **[DISCLAIMER.md](DISCLAIMER.md)** for full terms in English and German.
+>
+> Diese Software verändert die Konfiguration Ihrer Bose® SoundTouch®-Geräte. **Die Autoren übernehmen keinerlei Haftung für Schäden, Fehlfunktionen oder dauerhaftes Versagen („Bricking") Ihrer Geräte.** Die Nutzung erfolgt ausschließlich auf eigene Gefahr. Vollständige Bedingungen in Deutsch und Englisch: **[DISCLAIMER.md](DISCLAIMER.md)**
+
 **OpenCloudTouch** is a local, open-source solution for **Bose® SoundTouch® speakers** after the official cloud shutdown.
 
 Keep your SoundTouch® speakers (e.g. SoundTouch® 10/30/300) running — without the Bose® cloud, without the proprietary app. One container, one web app, full local control.

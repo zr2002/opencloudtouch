@@ -93,6 +93,9 @@ RUN python -m compileall -b opencloudtouch/ && \
 # Copy pre-built frontend from CI (platform-independent static files)
 COPY .out/dist ./frontend/dist
 
+# Copy legal files
+COPY LICENSE NOTICE DISCLAIMER.md ./
+
 # Copy entrypoint script
 COPY apps/backend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
