@@ -60,6 +60,6 @@ jobs:
             -Dsonar.tests=apps/backend/tests,apps/frontend/tests
             -Dsonar.exclusions=**/tests/**,**/__tests__/**,**/*.test.*
             -Dsonar.python.coverage.reportPaths=coverage-backend.xml
-            -Dsonar.javascript.lcov.reportPaths=apps/frontend/coverage/lcov.info
+            -Dsonar.javascript.lcov.reportPaths=.out/coverage/frontend/lcov.info
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { getErrorMessage, parseApiError } from "../api/types";
+import { getAvatarColor, getStationInitials } from "../utils/stationAvatar";
 import StationDetail from "./StationDetail";
 import "./RadioSearch.css";
 
@@ -64,44 +65,6 @@ const SEARCH_PLACEHOLDERS: Record<SearchType, string> = {
   country: "z.B. Germany, Austria…",
   tag: "z.B. rock, jazz, pop…",
 };
-
-/**
- * Get initials for station avatar (Teams-style fallback when no favicon).
- */
-function getStationInitials(name: string): string {
-  const words = name.trim().split(/\s+/);
-  const first = words[0];
-  const second = words[1];
-  if (words.length >= 2 && first && second) {
-    return ((first[0] ?? "") + (second[0] ?? "")).toUpperCase();
-  }
-  return name.trim().substring(0, Math.min(2, name.trim().length)).toUpperCase();
-}
-
-/**
- * Generate a deterministic color from station name for avatar background.
- */
-function getAvatarColor(name: string): string {
-  const colors = [
-    "#6264A7",
-    "#E74856",
-    "#0078D4",
-    "#00B294",
-    "#8764B8",
-    "#CA5010",
-    "#038387",
-    "#8E562E",
-    "#4C6EF5",
-    "#D13438",
-    "#107C10",
-    "#AC008C",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length] ?? "#6264A7";
-}
 
 export default function RadioSearch({
   onStationSelect,
