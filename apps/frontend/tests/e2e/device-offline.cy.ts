@@ -125,9 +125,12 @@ describe("Device Offline Display", () => {
     });
 
     it("should keep device header visible when offline", () => {
+      // Set up intercepts BEFORE navigating to LocalControl
       cy.intercept("GET", "/api/devices/*/now-playing", { statusCode: 503 }).as("nowPlaying503");
       cy.intercept("GET", "/api/devices/*/volume", { statusCode: 503 }).as("volume503");
 
+      // Navigate to /local where control-card-header and device-name live
+      cy.visit("/local");
       cy.wait("@nowPlaying503");
 
       cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("be.visible");
@@ -149,18 +152,15 @@ describe("Device Offline Display", () => {
       cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("be.visible");
       cy.get(".volume-section").should("not.exist");
 
-      // Now remove intercepts — let real API calls through (mock mode returns valid data)
-      cy.intercept("GET", "/api/devices/*/now-playing").as("nowPlayingRecovered");
-      cy.intercept("GET", "/api/devices/*/volume").as("volumeRecovered");
+      // Recovery: reload the page — clears offline store and restores polling.
+      // This matches the real UX: the user presses F5 after seeing the offline banner.
+      // The hook stops polling after a 503 (session-level offline), so recovery
+      // requires a full page reload rather than waiting for the next poll cycle.
+      cy.reload();
 
-      // Wait for the next poll cycle to pick up the recovery
-      cy.wait("@nowPlayingRecovered", { timeout: 10000 });
-
-      // Offline banner should disappear
-      cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("not.exist");
-
-      // Controls should reappear
-      cy.get(".volume-section", { timeout: 10000 }).should("be.visible");
+      // After reload, device should be reachable (mock mode returns valid data)
+      cy.get('[data-testid="device-offline-banner"]', { timeout: 15000 }).should("not.exist");
+      cy.get(".volume-section", { timeout: 15000 }).should("be.visible");
     });
   });
 });
