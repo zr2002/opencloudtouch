@@ -111,15 +111,13 @@ describe("Device Offline Display", () => {
   describe("Controls Hidden When Offline", () => {
     // Tests in this block navigate to /local (LocalControl) because volume-section,
     // source-section, and playback-section only exist there.
+    // Intercepts are registered BEFORE cy.visit so the very first mount request hits them.
 
     it("should hide volume, source, and playback controls when device is offline", () => {
-      cy.visit("/local");
-
       cy.intercept("GET", "/api/devices/*/now-playing", { statusCode: 503 }).as("nowPlaying503");
       cy.intercept("GET", "/api/devices/*/volume", { statusCode: 503 }).as("volume503");
 
-      // Reload triggers the mount request which hits the 503 intercept
-      cy.reload();
+      cy.visit("/local");
       cy.wait("@nowPlaying503", { timeout: 10000 });
 
       cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("be.visible");
@@ -131,13 +129,10 @@ describe("Device Offline Display", () => {
     });
 
     it("should keep device header visible when offline", () => {
-      cy.visit("/local");
-
       cy.intercept("GET", "/api/devices/*/now-playing", { statusCode: 503 }).as("nowPlaying503");
       cy.intercept("GET", "/api/devices/*/volume", { statusCode: 503 }).as("volume503");
 
-      // Reload triggers the mount request which hits the 503 intercept
-      cy.reload();
+      cy.visit("/local");
       cy.wait("@nowPlaying503", { timeout: 10000 });
 
       cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("be.visible");
@@ -150,27 +145,25 @@ describe("Device Offline Display", () => {
 
   describe("Recovery: Device Comes Back Online", () => {
     it("should remove offline banner and restore controls when device recovers", () => {
+      // Phase 1: offline — intercept registered BEFORE visit so initial mount request gets 503
+      cy.intercept("GET", "/api/devices/*/now-playing", { statusCode: 503 }).as("nowPlaying503");
+      cy.intercept("GET", "/api/devices/*/volume", { statusCode: 503 }).as("volume503");
+
       cy.visit("/local");
-
-      // times:1 — fires exactly once, then auto-expires so the recovery reload gets a real 200
-      cy.intercept(
-        { method: "GET", url: "/api/devices/*/now-playing", times: 1 },
-        { statusCode: 503 },
-      ).as("nowPlaying503");
-      cy.intercept(
-        { method: "GET", url: "/api/devices/*/volume", times: 1 },
-        { statusCode: 503 },
-      ).as("volume503");
-
-      // Reload triggers mount request → hits the single-use 503 intercept → device offline
-      cy.reload();
       cy.wait("@nowPlaying503", { timeout: 10000 });
 
       cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("be.visible");
       cy.get(".volume-section").should("not.exist");
 
-      // Recovery: reload again — offlineDeviceStore resets (module-level Set) and
-      // the intercept is already expired (times:1 consumed), so mock backend returns 200.
+      // Phase 2: recovery — override intercepts to pass through, then reload.
+      // cy.reload() resets the JS module context, so offlineDeviceStore clears.
+      // The now-playing request on the fresh mount goes to the real backend (mock mode → 200).
+      cy.intercept("GET", "/api/devices/*/now-playing", (req) => {
+        req.continue();
+      });
+      cy.intercept("GET", "/api/devices/*/volume", (req) => {
+        req.continue();
+      });
       cy.reload();
 
       cy.get(".volume-section", { timeout: 15000 }).should("be.visible");
