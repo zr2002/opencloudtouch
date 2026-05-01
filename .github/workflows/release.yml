@@ -168,6 +168,9 @@ jobs:
           sed -i "s/__version__ = \"[^\"]*\"/__version__ = \"$VERSION\"/" apps/backend/src/opencloudtouch/__init__.py
           echo "  apps/backend/src/opencloudtouch/__init__.py"
 
+          sed -i "s/version=\"[0-9]*\.[0-9]*\.[0-9]*\"/version=\"$VERSION\"/g" apps/backend/src/opencloudtouch/main.py
+          echo "  apps/backend/src/opencloudtouch/main.py"
+
           echo ""
           echo "Verification:"
           grep '"version"' package.json | head -1
@@ -175,12 +178,13 @@ jobs:
           grep '^version' apps/backend/pyproject.toml | head -1
           grep '^  version:' apps/backend/openapi.yaml | head -1
           grep '__version__' apps/backend/src/opencloudtouch/__init__.py | head -1
+          grep 'version=' apps/backend/src/opencloudtouch/main.py | head -2
 
       - name: Commit and push version bump
         id: commit
         run: |
           VERSION="${{ needs.preflight.outputs.version }}"
-          git add package.json package-lock.json apps/frontend/package.json apps/backend/pyproject.toml apps/backend/openapi.yaml apps/backend/src/opencloudtouch/__init__.py
+          git add package.json package-lock.json apps/frontend/package.json apps/backend/pyproject.toml apps/backend/openapi.yaml apps/backend/src/opencloudtouch/__init__.py apps/backend/src/opencloudtouch/main.py
           if git diff --cached --quiet; then
             echo "Nothing to commit (versions already at $VERSION)"
           else
