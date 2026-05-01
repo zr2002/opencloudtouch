@@ -17,6 +17,7 @@ from opencloudtouch.bmx.resolve_routes import resolve_router
 from opencloudtouch.devices.api.discovery_routes import discovery_router
 from opencloudtouch.bmx.routes import router as bmx_router
 from opencloudtouch.core.config import get_config, init_config
+from opencloudtouch import __version__
 from opencloudtouch.core.exception_handlers import (
     register_exception_handlers,  # re-exported for backward compat
 )
@@ -187,7 +188,7 @@ init_config()
 # FastAPI app
 app = FastAPI(
     title="OpenCloudTouch",
-    version="1.1.4",
+    version=__version__,
     description="Open-Source replacement for discontinued streaming device cloud features",
     lifespan=lifespan,
 )
@@ -254,7 +255,7 @@ async def health_check():
         status_code=200,
         content={
             "status": "healthy",
-            "version": "1.1.4",
+            "version": __version__,
             "config": {
                 "discovery_enabled": cfg.discovery_enabled,
             },
