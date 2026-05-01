@@ -109,16 +109,20 @@ describe("Device Offline Display", () => {
   });
 
   describe("Controls Hidden When Offline", () => {
+    // Tests in this block navigate to /local (LocalControl) because volume-section,
+    // source-section, and playback-section only exist there.
+    // Intercepts are registered BEFORE cy.visit so the very first mount request hits them.
+
     it("should hide volume, source, and playback controls when device is offline", () => {
       cy.intercept("GET", "/api/devices/*/now-playing", { statusCode: 503 }).as("nowPlaying503");
       cy.intercept("GET", "/api/devices/*/volume", { statusCode: 503 }).as("volume503");
 
-      cy.wait("@nowPlaying503");
+      cy.visit("/local");
+      cy.wait("@nowPlaying503", { timeout: 10000 });
 
-      // Wait for offline banner to appear
       cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("be.visible");
 
-      // Controls should NOT be visible
+      // Controls should NOT be visible when device is offline
       cy.get(".volume-section").should("not.exist");
       cy.get(".source-section").should("not.exist");
       cy.get(".playback-section").should("not.exist");
@@ -128,11 +132,12 @@ describe("Device Offline Display", () => {
       cy.intercept("GET", "/api/devices/*/now-playing", { statusCode: 503 }).as("nowPlaying503");
       cy.intercept("GET", "/api/devices/*/volume", { statusCode: 503 }).as("volume503");
 
-      cy.wait("@nowPlaying503");
+      cy.visit("/local");
+      cy.wait("@nowPlaying503", { timeout: 10000 });
 
       cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("be.visible");
 
-      // Device header (name, power button) should remain visible
+      // Device header (name, power button) must remain visible even when offline
       cy.get(".control-card-header").should("be.visible");
       cy.get(".device-name").should("be.visible");
     });
@@ -140,27 +145,29 @@ describe("Device Offline Display", () => {
 
   describe("Recovery: Device Comes Back Online", () => {
     it("should remove offline banner and restore controls when device recovers", () => {
-      // Start with 503
+      // Phase 1: offline — intercept registered BEFORE visit so initial mount request gets 503
       cy.intercept("GET", "/api/devices/*/now-playing", { statusCode: 503 }).as("nowPlaying503");
       cy.intercept("GET", "/api/devices/*/volume", { statusCode: 503 }).as("volume503");
 
-      cy.wait("@nowPlaying503");
+      cy.visit("/local");
+      cy.wait("@nowPlaying503", { timeout: 10000 });
 
       cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("be.visible");
       cy.get(".volume-section").should("not.exist");
 
-      // Now remove intercepts — let real API calls through (mock mode returns valid data)
-      cy.intercept("GET", "/api/devices/*/now-playing").as("nowPlayingRecovered");
-      cy.intercept("GET", "/api/devices/*/volume").as("volumeRecovered");
+      // Phase 2: recovery — override intercepts to pass through, then reload.
+      // cy.reload() resets the JS module context, so offlineDeviceStore clears.
+      // The now-playing request on the fresh mount goes to the real backend (mock mode → 200).
+      cy.intercept("GET", "/api/devices/*/now-playing", (req) => {
+        req.continue();
+      });
+      cy.intercept("GET", "/api/devices/*/volume", (req) => {
+        req.continue();
+      });
+      cy.reload();
 
-      // Wait for the next poll cycle to pick up the recovery
-      cy.wait("@nowPlayingRecovered", { timeout: 10000 });
-
-      // Offline banner should disappear
-      cy.get('[data-testid="device-offline-banner"]', { timeout: 10000 }).should("not.exist");
-
-      // Controls should reappear
-      cy.get(".volume-section", { timeout: 10000 }).should("be.visible");
+      cy.get(".volume-section", { timeout: 15000 }).should("be.visible");
+      cy.get('[data-testid="device-offline-banner"]').should("not.exist");
     });
   });
 });

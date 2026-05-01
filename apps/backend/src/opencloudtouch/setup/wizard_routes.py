@@ -140,11 +140,16 @@ async def wizard_detect_strategy(request: Request) -> DetectStrategyResponse:
 
 
 def _check_port_443(hostname: str) -> bool:
-    """Try an SSL handshake on port 443 to detect a reverse proxy."""
+    """Try an SSL handshake on port 443 to detect a reverse proxy.
+
+    SSL verification is intentionally disabled: this function only checks
+    whether *any* service responds on 443, without sending sensitive data.
+    The server may use a self-signed certificate.
+    """
     try:
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)  # NOSONAR - intentional
+        ctx.check_hostname = False  # NOSONAR - port detection only
+        ctx.verify_mode = ssl.CERT_NONE  # NOSONAR - no sensitive data sent
         with socket.create_connection((hostname, 443), timeout=3) as sock:
             with ctx.wrap_socket(sock, server_hostname=hostname):
                 return True

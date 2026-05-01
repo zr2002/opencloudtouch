@@ -67,8 +67,8 @@ body:
     id: version
     attributes:
       label: OpenCloudTouch Version
-      description: "Which version are you running? (visible in Settings → About)"
-      placeholder: "e.g. v1.1.2"
+      description: "Which version are you running? Check via `curl http://<your-host>:7777/health` — the `version` field in the response."
+      placeholder: "e.g. 0.2.0"
     validations:
       required: true
 

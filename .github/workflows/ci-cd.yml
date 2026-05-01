@@ -60,7 +60,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
@@ -97,7 +97,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
@@ -136,7 +136,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
@@ -218,7 +218,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
@@ -279,7 +279,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
@@ -318,16 +318,17 @@ jobs:
           curl --retry 10 --retry-delay 2 --retry-connrefused http://localhost:4173
 
       - name: Run Cypress E2E tests
+        id: e2e
         working-directory: apps/frontend
         run: npm run test:e2e
-        continue-on-error: true  # E2E tests may fail due to environment differences
+        continue-on-error: true  # collect all failures in one run; job fails via check step below
         env:
           CYPRESS_BASE_URL: http://localhost:4173
           CYPRESS_API_URL: http://localhost:7778/api
 
       - name: Upload Cypress screenshots on failure
         uses: actions/upload-artifact@v7
-        if: failure()
+        if: steps.e2e.outcome == 'failure'
         with:
           name: cypress-screenshots
           path: apps/frontend/tests/e2e/screenshots
@@ -335,11 +336,17 @@ jobs:
 
       - name: Upload Cypress videos on failure
         uses: actions/upload-artifact@v7
-        if: failure()
+        if: steps.e2e.outcome == 'failure'
         with:
           name: cypress-videos
           path: apps/frontend/tests/e2e/videos
           retention-days: 7
+
+      - name: Fail job if E2E tests failed
+        if: steps.e2e.outcome == 'failure'
+        run: |
+          echo "E2E tests failed — see cypress-screenshots/videos artifacts for details"
+          exit 1
 
   # ============================================================================
   # DOCKER SECURITY SCAN (gate before multi-arch build - BUILD-04)

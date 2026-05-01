@@ -5,6 +5,8 @@ on:
       - main
   pull_request:
     types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday 6:00 UTC
 jobs:
   sonarqube:
     name: SonarQube
@@ -12,7 +14,40 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Generate backend coverage
+        run: |
+          pip install -e apps/backend
+          pip install -r apps/backend/requirements-dev.txt
+          cd apps/backend
+          pytest --cov=opencloudtouch --cov-report=xml:../../coverage-backend.xml -q --tb=no
+        env:
+          OCT_MOCK_MODE: "true"
+          OCT_HAS_DEVICES: "false"
+          CI: "true"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Generate frontend coverage
+        run: |
+          npm ci
+          cd apps/frontend
+          npx vitest run --coverage --reporter=dot
+        env:
+          CI: "true"
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v7
         with:
@@ -22,6 +57,9 @@ jobs:
             -Dsonar.qualitygate.wait=false
             -Dsonar.projectName=opencloudtouch
             -Dsonar.sources=apps/backend/src,apps/frontend/src
-            -Dsonar.exclusions=**/tests/**,**/__tests__/**,**/*.test.*,**/pytest.ini,**/sonar-project.properties
+            -Dsonar.tests=apps/backend/tests,apps/frontend/tests
+            -Dsonar.exclusions=**/tests/**,**/__tests__/**,**/*.test.*
+            -Dsonar.python.coverage.reportPaths=coverage-backend.xml
+            -Dsonar.javascript.lcov.reportPaths=.out/coverage/frontend/lcov.info
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

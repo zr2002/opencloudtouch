@@ -49,7 +49,7 @@ class DeviceHealthCheck:
             try:
                 await self._task
             except asyncio.CancelledError:
-                pass
+                logger.debug("Health-check task cancelled")
             self._task = None
             logger.info("Device health-check stopped")
 
@@ -65,7 +65,7 @@ class DeviceHealthCheck:
                     self._last_ssh_verify = now
 
             except asyncio.CancelledError:
-                break
+                raise
             except Exception:
                 logger.exception("Health-check cycle failed")
 

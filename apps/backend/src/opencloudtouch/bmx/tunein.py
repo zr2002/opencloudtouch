@@ -6,6 +6,7 @@ as a replacement for the Bose Cloud TuneIn integration.
 
 import logging
 import os
+import re
 from xml.etree import ElementTree
 
 import httpx
@@ -16,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 TUNEIN_DESCRIBE_URL = "https://opml.radiotime.com/describe.ashx?id=%s"
 TUNEIN_STREAM_URL = "http://opml.radiotime.com/Tune.ashx?id=%s&formats=mp3,aac,ogg"
+
+_STATION_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 def get_oct_base_url() -> str:
@@ -82,6 +85,9 @@ async def resolve_tunein_station(station_id: str) -> BmxPlaybackResponse:
         BmxPlaybackResponse with stream URLs
     """
     logger.info(f"[BMX TUNEIN] Resolving station: {station_id}")
+
+    if not _STATION_ID_RE.match(station_id):
+        raise ValueError(f"Invalid station ID format: {station_id}")
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:

@@ -30,7 +30,7 @@ export default function ManualIPModal({ isOpen, onClose }: ManualIPModalProps) {
       setValidationError(null);
       setSuccess(false);
     }
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen]); // eslint-disable-line @eslint-react/exhaustive-deps
 
   // REFACT-135: Real-time validation as user types
   const handleIpListChange = (value: string) => {
@@ -86,8 +86,19 @@ export default function ManualIPModal({ isOpen, onClose }: ManualIPModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose} data-test="modal-overlay">
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} data-test="modal-content">
+    <div
+      className="modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+      tabIndex={-1}
+      role="none"
+      data-test="modal-overlay"
+    >
+      <dialog className="modal-content" open data-test="modal-content">
         <div className="modal-header">
           <h2 data-test="modal-title">Manuelle IP-Konfiguration</h2>
           <button className="modal-close" onClick={onClose} aria-label="Schließen">
@@ -191,7 +202,7 @@ export default function ManualIPModal({ isOpen, onClose }: ManualIPModalProps) {
             {setManualIPs.isPending ? "Speichere..." : "Speichern"}
           </button>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }
