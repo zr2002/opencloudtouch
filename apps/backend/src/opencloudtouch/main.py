@@ -187,7 +187,7 @@ init_config()
 # FastAPI app
 app = FastAPI(
     title="OpenCloudTouch",
-    version="0.2.0",
+    version="1.1.3",
     description="Open-Source replacement for discontinued streaming device cloud features",
     lifespan=lifespan,
 )
@@ -254,7 +254,7 @@ async def health_check():
         status_code=200,
         content={
             "status": "healthy",
-            "version": "0.2.0",
+            "version": "1.1.3",
             "config": {
                 "discovery_enabled": cfg.discovery_enabled,
             },
