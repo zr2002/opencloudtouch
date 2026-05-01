@@ -405,6 +405,7 @@ jobs:
 
           gh workflow run build-images.yml \
             --repo "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}" \
             --field version="${VERSION}" \
             --field architectures=all \
             --field attach_to_release=true
