@@ -2531,6 +2531,20 @@ paths:
           content:
             application/json:
               schema: {}
+  /api/logs/backend:
+    get:
+      tags:
+        - logs
+      summary: Download Backend Log
+      description: Returns the in-memory backend log as a plain-text file download.
+      operationId: download_backend_log_api_logs_backend_get
+      responses:
+        '200':
+          description: Plain-text log file download
+          content:
+            text/plain:
+              schema:
+                type: string
 components:
   schemas:
     BackupRequest:
