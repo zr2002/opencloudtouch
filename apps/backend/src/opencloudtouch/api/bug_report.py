@@ -162,11 +162,7 @@ async def _collect_diagnostics(request: Request, click_timestamp: float = 0.0) -
         logger.debug("Could not collect recents count for bug report")
 
     ring_buffer = get_log_entries()
-    backend_logs = (
-        ring_buffer.get_entries(before_timestamp=click_timestamp, limit=100)
-        if ring_buffer
-        else []
-    )
+    backend_logs = ring_buffer[-100:] if ring_buffer else []
 
     # Anonymize manual_device_ips
     anon_ips = [_anonymize_ip(ip) for ip in config.manual_device_ips]
