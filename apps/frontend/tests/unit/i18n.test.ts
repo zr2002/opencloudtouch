@@ -10,6 +10,12 @@ import en from "../../src/i18n/locales/en.json";
 import de from "../../src/i18n/locales/de.json";
 import fr from "../../src/i18n/locales/fr.json";
 import itLocale from "../../src/i18n/locales/it.json";
+import es from "../../src/i18n/locales/es.json";
+import nl from "../../src/i18n/locales/nl.json";
+import ptBR from "../../src/i18n/locales/pt-BR.json";
+import ja from "../../src/i18n/locales/ja.json";
+import pl from "../../src/i18n/locales/pl.json";
+import sv from "../../src/i18n/locales/sv.json";
 
 describe("detectLocale", () => {
   beforeEach(() => {
@@ -169,5 +175,100 @@ describe("Translation key parity", () => {
   it("en.json has all keys from it.json", () => {
     const enSet = new Set(enKeys());
     expect(flattenKeys(itLocale).filter((k) => !enSet.has(k))).toEqual([]);
+  });
+
+  it("es.json has all keys from en.json", () => {
+    const esKeys = new Set(flattenKeys(es));
+    expect(enKeys().filter((k) => !esKeys.has(k))).toEqual([]);
+  });
+
+  it("en.json has all keys from es.json", () => {
+    const enSet = new Set(enKeys());
+    expect(flattenKeys(es).filter((k) => !enSet.has(k))).toEqual([]);
+  });
+
+  it("nl.json has all keys from en.json", () => {
+    const nlKeys = new Set(flattenKeys(nl));
+    expect(enKeys().filter((k) => !nlKeys.has(k))).toEqual([]);
+  });
+
+  it("en.json has all keys from nl.json", () => {
+    const enSet = new Set(enKeys());
+    expect(flattenKeys(nl).filter((k) => !enSet.has(k))).toEqual([]);
+  });
+
+  it("pt-BR.json has all keys from en.json", () => {
+    const ptKeys = new Set(flattenKeys(ptBR));
+    expect(enKeys().filter((k) => !ptKeys.has(k))).toEqual([]);
+  });
+
+  it("en.json has all keys from pt-BR.json", () => {
+    const enSet = new Set(enKeys());
+    expect(flattenKeys(ptBR).filter((k) => !enSet.has(k))).toEqual([]);
+  });
+
+  it("ja.json has all keys from en.json", () => {
+    const jaKeys = new Set(flattenKeys(ja));
+    expect(enKeys().filter((k) => !jaKeys.has(k))).toEqual([]);
+  });
+
+  it("en.json has all keys from ja.json", () => {
+    const enSet = new Set(enKeys());
+    expect(flattenKeys(ja).filter((k) => !enSet.has(k))).toEqual([]);
+  });
+
+  it("pl.json has all keys from en.json", () => {
+    const plKeys = new Set(flattenKeys(pl));
+    expect(enKeys().filter((k) => !plKeys.has(k))).toEqual([]);
+  });
+
+  it("en.json has all keys from pl.json", () => {
+    const enSet = new Set(enKeys());
+    expect(flattenKeys(pl).filter((k) => !enSet.has(k))).toEqual([]);
+  });
+
+  it("sv.json has all keys from en.json", () => {
+    const svKeys = new Set(flattenKeys(sv));
+    expect(enKeys().filter((k) => !svKeys.has(k))).toEqual([]);
+  });
+
+  it("en.json has all keys from sv.json", () => {
+    const enSet = new Set(enKeys());
+    expect(flattenKeys(sv).filter((k) => !enSet.has(k))).toEqual([]);
+  });
+});
+
+describe("detectLocale — localStorage unavailable (catch branch)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("falls back to browser language when localStorage.getItem throws", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("localStorage unavailable");
+    });
+    vi.spyOn(navigator, "language", "get").mockReturnValue("de-DE");
+    expect(detectLocale()).toBe("de");
+  });
+
+  it("falls back to 'en' when localStorage throws and browser language unsupported", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("localStorage unavailable");
+    });
+    vi.spyOn(navigator, "language", "get").mockReturnValue("zh-CN");
+    expect(detectLocale()).toBe("en");
+  });
+});
+
+describe("changeLanguage — localStorage unavailable (catch branch)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("does not throw when localStorage.setItem throws", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("localStorage unavailable");
+    });
+    expect(() => changeLanguage("fr")).not.toThrow();
   });
 });

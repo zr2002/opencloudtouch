@@ -133,4 +133,43 @@ describe("LanguageSelector", () => {
       expect(option).toHaveAttribute("aria-selected");
     }
   });
+
+  it("selects locale on Enter key press and closes dropdown", () => {
+    render(<LanguageSelector />);
+    fireEvent.click(screen.getByRole("button", { name: /language|select language/i }));
+
+    const options = screen.getAllByRole("option");
+    const deOption = options.find(
+      (o) => o.textContent?.includes("DE") || o.textContent?.includes("Deutsch")
+    );
+    expect(deOption).toBeDefined();
+    fireEvent.keyDown(deOption!, { key: "Enter" });
+
+    expect(i18nModule.changeLanguage).toHaveBeenCalledWith("de");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("selects locale on Space key press and closes dropdown", () => {
+    render(<LanguageSelector />);
+    fireEvent.click(screen.getByRole("button", { name: /language|select language/i }));
+
+    const options = screen.getAllByRole("option");
+    const frOption = options.find(
+      (o) => o.textContent?.includes("FR") || o.textContent?.includes("Français")
+    );
+    expect(frOption).toBeDefined();
+    fireEvent.keyDown(frOption!, { key: " " });
+
+    expect(i18nModule.changeLanguage).toHaveBeenCalledWith("fr");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("options are focusable (tabIndex=0)", () => {
+    render(<LanguageSelector />);
+    fireEvent.click(screen.getByRole("button", { name: /language|select language/i }));
+    const options = screen.getAllByRole("option");
+    for (const option of options) {
+      expect(option).toHaveAttribute("tabindex", "0");
+    }
+  });
 });

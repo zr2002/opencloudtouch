@@ -66,7 +66,14 @@ export default function LanguageSelector() {
                 role="option"
                 aria-selected={isActive}
                 className={`lang-option${isActive ? " lang-option--active" : ""}`}
+                tabIndex={0}
                 onClick={() => handleSelect(locale)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleSelect(locale);
+                  }
+                }}
               >
                 <span className={`fi fi-${config.flag} lang-option-flag`} aria-hidden="true" />
                 <span className="lang-option-name">{config.nativeName}</span>
