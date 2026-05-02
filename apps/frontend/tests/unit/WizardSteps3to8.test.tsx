@@ -5,8 +5,19 @@
  * covers the useTranslation / t() calls added in the i18n migration.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import React from "react";
+
+// Mock the wizard API to prevent async state updates during render
+vi.mock("../../src/api/wizard", () => ({
+  detectStrategy: vi.fn().mockResolvedValue({ strategy: "hosts", details: "" }),
+  modifyConfig: vi.fn().mockResolvedValue({}),
+  getServerInfo: vi.fn().mockResolvedValue({}),
+  verifyRedirect: vi.fn().mockResolvedValue({ success: true }),
+  rebootDevice: vi.fn().mockResolvedValue({}),
+  createBackup: vi.fn().mockResolvedValue({ path: "/backup/file.bak" }),
+  modifyHosts: vi.fn().mockResolvedValue({}),
+}));
 
 // Mock framer-motion
 vi.mock("framer-motion", () => ({
@@ -94,17 +105,19 @@ describe("Step5ConfigModification — render", () => {
     const { default: Step5 } = await import(
       "../../src/components/wizard/Step5ConfigModification"
     );
-    render(
-      <Step5
-        deviceId="device-1"
-        deviceIp="192.168.1.1"
-        deviceName="SoundTouch 10"
-        octUrl="http://192.168.1.100:8080"
-        onNext={vi.fn()}
-        onPrevious={vi.fn()}
-        onConfigModified={vi.fn()}
-      />
-    );
+    await act(async () => {
+      render(
+        <Step5
+          deviceId="device-1"
+          deviceIp="192.168.1.1"
+          deviceName="SoundTouch 10"
+          octUrl="http://192.168.1.100:8080"
+          onNext={vi.fn()}
+          onPrevious={vi.fn()}
+          onConfigModified={vi.fn()}
+        />
+      );
+    });
     expect(document.body).toBeInTheDocument();
   });
 });
@@ -140,15 +153,17 @@ describe("Step7Verification — render", () => {
     const { default: Step7 } = await import(
       "../../src/components/wizard/Step7Verification"
     );
-    render(
-      <Step7
-        deviceIp="192.168.1.1"
-        deviceName="SoundTouch 10"
-        octIp="192.168.1.100"
-        onNext={vi.fn()}
-        onPrevious={vi.fn()}
-      />
-    );
+    await act(async () => {
+      render(
+        <Step7
+          deviceIp="192.168.1.1"
+          deviceName="SoundTouch 10"
+          octIp="192.168.1.100"
+          onNext={vi.fn()}
+          onPrevious={vi.fn()}
+        />
+      );
+    });
     expect(document.body).toBeInTheDocument();
   });
 });

@@ -23,6 +23,7 @@ from opencloudtouch.core.exception_handlers import (
 )
 from opencloudtouch.core.logging import setup_logging
 from opencloudtouch.core.logs_routes import router as logs_router
+from opencloudtouch.api.bug_report import router as bug_report_router
 from opencloudtouch.core.static_files import (
     find_frontend_static_dir,
     mount_static_files,
@@ -246,6 +247,7 @@ app.include_router(swupdate_router)  # SWUpdate firmware index emulation
 app.include_router(zones_router)  # Multi-room zone management
 app.include_router(device_zone_router)  # Per-device zone status
 app.include_router(logs_router)  # Backend log download
+app.include_router(bug_report_router)  # Bug report submission
 
 
 # Health endpoint
