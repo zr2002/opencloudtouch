@@ -1,5 +1,5 @@
 # Dependabot configuration for automated dependency updates
-# Monitors Python (backend) and npm (frontend) dependencies weekly
+# Version updates: quarterly | Security updates: immediately (GitHub-triggered)
 
 version: 2
 updates:
@@ -7,9 +7,9 @@ updates:
   - package-ecosystem: "pip"
     directory: "/apps/backend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "quarterly"
       time: "06:00"
+      timezone: "Europe/Berlin"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
@@ -23,22 +23,28 @@ updates:
       - "user"
     assignees:
       - "user"
-    # Group minor and patch updates together
     groups:
+      # minor+patch: 1 PR per quarter
       python-minor-patch:
+        applies-to: version-updates
         patterns:
           - "*"
         update-types:
           - "minor"
           - "patch"
+      # security: immediate, bundled
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
   # Frontend npm dependencies
   - package-ecosystem: "npm"
     directory: "/apps/frontend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "quarterly"
       time: "06:00"
+      timezone: "Europe/Berlin"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
@@ -54,27 +60,33 @@ updates:
       - "user"
     # Ignore major versions for stable dependencies
     ignore:
-      # React stays at 18.x for stability
+      # React stays at current major for stability
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
-    # Group minor and patch updates together
     groups:
+      # minor+patch: 1 PR per quarter
       npm-minor-patch:
+        applies-to: version-updates
         patterns:
           - "*"
         update-types:
           - "minor"
           - "patch"
+      # security: immediate, bundled
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
   # Root-level npm dependencies (workspace management)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "quarterly"
       time: "06:00"
+      timezone: "Europe/Berlin"
     open-pull-requests-limit: 3
     labels:
       - "dependencies"
@@ -89,9 +101,9 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "quarterly"
       time: "06:00"
+      timezone: "Europe/Berlin"
     open-pull-requests-limit: 3
     labels:
       - "dependencies"
