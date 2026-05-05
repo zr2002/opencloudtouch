@@ -1,4 +1,4 @@
-/**
+﻿/**
  * E2E Test: Wizard Device Persistence
  *
  * Tests the device selection persistence when navigating between:
@@ -11,6 +11,17 @@
  * 2. Correct device IP used for SSH checks
  * 3. Device selection persists when returning to preset page
  */
+
+/** Force German locale — CI defaults to English (navigator.language='en') */
+function visitDe(url: string, options?: Partial<Cypress.VisitOptions>) {
+  cy.visit(url, {
+    ...options,
+    onBeforeLoad(win) {
+      win.localStorage.setItem('oct-lang', 'de');
+      options?.onBeforeLoad?.(win);
+    },
+  });
+}
 
 describe('Wizard Device Persistence', () => {
   const apiUrl = Cypress.expose('apiUrl') || 'http://localhost:7778/api';
@@ -72,7 +83,7 @@ describe('Wizard Device Persistence', () => {
     cy.intercept('POST', '/api/devices/sync', { statusCode: 200, body: { discovered: 0, synced: 0, failed: 0 } });
 
     // Visit preset page
-    cy.visit('/');
+    visitDe('/');
     cy.wait('@getDevices');
   });
 
@@ -213,7 +224,7 @@ describe('Wizard Device Persistence', () => {
 
   it('should show correct device when accessing wizard via direct URL', () => {
     // Directly visit wizard with specific device
-    cy.visit('/setup-wizard?deviceId=DEVICE_KITCHEN');
+    visitDe('/setup-wizard?deviceId=DEVICE_KITCHEN');
 
     // Wait for devices to load
     cy.wait('@getDevices');
@@ -235,7 +246,7 @@ describe('Wizard Device Persistence', () => {
 
   it('should handle invalid deviceId gracefully', () => {
     // Visit wizard with non-existent device
-    cy.visit('/setup-wizard?deviceId=INVALID_DEVICE');
+    visitDe('/setup-wizard?deviceId=INVALID_DEVICE');
     cy.wait('@getDevices');
     cy.get('.setup-wizard-page-v2', { timeout: 8000 }).should('exist');
 

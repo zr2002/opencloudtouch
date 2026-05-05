@@ -212,6 +212,7 @@ class BoseDeviceClientAdapter(DeviceClient):
         station_name: str,
         oct_backend_url: str,
         station_image_url: str = "",
+        station_uuid: str = "",
     ) -> None:
         """
         Store a preset on the Bose device using LOCAL_INTERNET_RADIO + Orion adapter.
@@ -264,6 +265,9 @@ class BoseDeviceClientAdapter(DeviceClient):
                 "name": station_name,
                 "imageUrl": station_image_url,
             }
+            # TuneIn stations have empty URL - store station ID for dynamic resolution
+            if not station_url and station_uuid:
+                stream_data["tuneinId"] = station_uuid
             json_str = json.dumps(stream_data)
             base64_data = base64.urlsafe_b64encode(json_str.encode()).decode()
 
@@ -274,14 +278,13 @@ class BoseDeviceClientAdapter(DeviceClient):
             )
 
             logger.info(
-                f"Storing preset {preset_number} on {self.ip}: {station_name}",
+                "Storing preset %d on %s",
+                preset_number,
+                self.ip,
                 extra={
                     "device_ip": self.ip,
                     "device_id": device_id,
                     "preset_number": preset_number,
-                    "station_name": station_name,
-                    "orion_url": orion_url[:100] + "...",
-                    "upstream_url": station_url,
                 },
             )
 
@@ -306,7 +309,8 @@ class BoseDeviceClientAdapter(DeviceClient):
                 response.raise_for_status()
 
             logger.info(
-                f"✅ Bose device programmed with LOCAL_INTERNET_RADIO + Orion: {station_name}"
+                "Bose device programmed with LOCAL_INTERNET_RADIO + Orion (preset %d)",
+                preset_number,
             )
 
         except httpx.HTTPStatusError as e:

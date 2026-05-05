@@ -1,4 +1,4 @@
-/**
+﻿/**
  * E2E Test: Setup Wizard Full Flow — Bug Regression Suite
  *
  * CONTEXT FOR AI AGENTS:
@@ -96,14 +96,44 @@ function setupDeviceMocks() {
       message: "SSH dauerhaft aktiviert.",
     },
   }).as("enablePermanentSSH");
+
+  cy.intercept("GET", "/api/setup/wizard/detect-strategy", {
+    statusCode: 200,
+    body: {
+      proxy_available: false,
+      strategy: "bmx_and_hosts",
+      message: "Kein Reverse-Proxy auf Port 443 erkannt. Die BMX-URL muss zusätzlich geändert werden.",
+    },
+  }).as("detectStrategy");
+
+  cy.intercept("GET", "/api/setup/wizard/server-info", {
+    statusCode: 200,
+    body: {
+      server_url: "http://localhost:7778",
+      server_ip: "127.0.0.1",
+      default_port: 7777,
+      supported_protocols: ["http", "https"],
+    },
+  }).as("serverInfo");
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
+/** Force German locale — CI defaults to English (navigator.language='en') */
+function visitDe(url: string, options?: Partial<Cypress.VisitOptions>) {
+  cy.visit(url, {
+    ...options,
+    onBeforeLoad(win) {
+      win.localStorage.setItem("oct-lang", "de");
+      options?.onBeforeLoad?.(win);
+    },
+  });
+}
+
 describe("Setup Wizard — Bug Regression Suite", () => {
   beforeEach(() => {
     setupDeviceMocks();
-    cy.visit("/setup-wizard?deviceId=DEVICE_WOHNZIMMER");
+    visitDe("/setup-wizard?deviceId=DEVICE_WOHNZIMMER");
     cy.wait("@getDevices");
     // Wizard starts directly at Step 1 (mode selector was removed)
     cy.get('.setup-wizard-page-v2', { timeout: 8000 }).should('exist');
@@ -527,7 +557,7 @@ describe("Setup Wizard — Bug Regression Suite", () => {
         body: { devices: [{ device_id: "DISC1", name: "Wohnzimmer", model: "SoundTouch 10", ip: "192.168.1.79", mac: "AA:BB:CC:DD:EE:FF", type: "soundtouch" }] },
       }).as("getDevicesAfterDisc");
 
-      cy.visit("/");
+      visitDe("/");
       cy.wait("@getDevicesAfterDisc");
 
       // Must NOT be stuck in redirect loop

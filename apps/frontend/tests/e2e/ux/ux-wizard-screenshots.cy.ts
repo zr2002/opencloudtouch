@@ -1,4 +1,4 @@
-// Make this file a TypeScript module to avoid duplicate-declaration
+﻿// Make this file a TypeScript module to avoid duplicate-declaration
 // conflicts with shared helpers in ux-workflow-screenshots.cy.ts
 export {};
 
@@ -251,6 +251,25 @@ function setupWizardMocks() {
     statusCode: 200,
     body: { success: true, message: "Neustart eingeleitet" },
   }).as("rebootDevice");
+
+  // Intercept detect-strategy and server-info to prevent real backend calls
+  // that could return proxy_available=true and hide the config modification button
+  cy.intercept("GET", "/api/setup/wizard/detect-strategy", {
+    statusCode: 200,
+    body: {
+      proxy_available: false,
+      strategy: "bmx_and_hosts",
+      message: "Standard-Strategie: BMX + Hosts",
+    },
+  }).as("detectStrategy");
+
+  cy.intercept("GET", "/api/setup/wizard/server-info", {
+    statusCode: 200,
+    body: {
+      server_url: "http://localhost:7778",
+      server_ip: "127.0.0.1",
+    },
+  }).as("serverInfo");
 }
 
 /** Wait for wizard to be ready at Step 1 (mode selector was removed; wizard starts directly) */
@@ -308,6 +327,15 @@ function completeHostsStep() {
 
 Cypress.on("uncaught:exception", () => false);
 
+/** Force German locale — CI defaults to English (navigator.language='en') */
+function visitDe(url: string) {
+  cy.visit(url, {
+    onBeforeLoad(win) {
+      win.localStorage.setItem("oct-lang", "de");
+    },
+  });
+}
+
 describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
   beforeEach(() => {
     setupWizardMocks();
@@ -319,7 +347,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
   describe("Schritt 0 — Wizard-Start", () => {
     it("wiz_00a — Wizard-Start: Mit Gerät vorselektiert (Step 1)", () => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       cy.get(".setup-wizard-page-v2", { timeout: 8000 }).should("exist");
       screenshotBoth("wiz_00a_wizard-start__device-preselected");
@@ -327,7 +355,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
     it("wiz_00d — Wizard: Kein Gerät vorhanden (EmptyState)", () => {
       cy.intercept("GET", "/api/devices", { body: [] }).as("getDevicesEmpty");
-      cy.visit("/setup-wizard");
+      visitDe("/setup-wizard");
       cy.wait("@getDevicesEmpty");
       cy.get(".wizard-empty-state", { timeout: 6000 }).should("be.visible");
       screenshotBoth("wiz_00d_mode-selection__empty-state");
@@ -340,7 +368,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
   describe("Schritt 1 — USB-Vorbereitung", () => {
     beforeEach(() => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
     });
@@ -365,7 +393,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
   describe("Schritt 2 — PowerCycle & SSH-Port-Check", () => {
     beforeEach(() => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
       completeUSBPrep();
@@ -423,7 +451,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
   describe("Schritt 3 — Backup", () => {
     beforeEach(() => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
       completeUSBPrep();
@@ -466,7 +494,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
   describe("Schritt 4 — Konfiguration ändern", () => {
     beforeEach(() => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
       completeUSBPrep();
@@ -510,7 +538,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
   describe("Schritt 5 — Hosts-Datei ändern", () => {
     beforeEach(() => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
       completeUSBPrep();
@@ -556,7 +584,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
   describe("Schritt 6 — DNS-Verifikation", () => {
     beforeEach(() => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
       completeUSBPrep();
@@ -621,7 +649,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
   describe("Schritt 7 — Abschluss", () => {
     it("wiz_07a — Abschluss: Erfolgreicher Wizard-Durchlauf", () => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
       completeUSBPrep();
@@ -649,21 +677,21 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
     });
 
     it("wiz_mob_a — Mobile: Wizard-Start (Step 1)", () => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       cy.get(".setup-wizard-page-v2", { timeout: 8000 }).should("exist");
       screenshotBoth("wiz_mob_a_wizard-start__mobile-375");
     });
 
     it("wiz_mob_b — Mobile: USB-Vorbereitung", () => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
       screenshotBoth("wiz_mob_b_usb-prep__mobile-375");
     });
 
     it("wiz_mob_c — Mobile: SSH-Port-Check (SSH verfügbar)", () => {
-      cy.visit(`/setup-wizard?deviceId=${DEVICE.device_id}`);
+      visitDe(`/setup-wizard?deviceId=${DEVICE.device_id}`);
       cy.wait("@getDevices");
       selectManualMode();
       completeUSBPrep();

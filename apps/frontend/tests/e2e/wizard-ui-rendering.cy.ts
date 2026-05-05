@@ -22,7 +22,17 @@ function setupBasicMocks() {
     body: { devices: [MOCK_DEVICE] },
   }).as("getDevices");
 
-  cy.intercept("GET", "/api/presets*", {
+  cy.intercept("GET", "/api/devices/*/now-playing", {
+    statusCode: 200,
+    body: { source: "STANDBY", status: null },
+  });
+
+  cy.intercept("GET", "/api/devices/*/volume", {
+    statusCode: 200,
+    body: { actual_volume: 30, muted: false },
+  });
+
+  cy.intercept("GET", "/api/presets/*", {
     statusCode: 200,
     body: {
       presets: [
@@ -62,13 +72,11 @@ describe("Preset Search Modal — layout", () => {
     setupBasicMocks();
     cy.visit(FRONTEND_BASE);
     cy.wait("@getDevices");
+    cy.wait("@getPresets");
   });
 
   it("modal is rendered as div[role=dialog], not as dialog element", () => {
-    // Open presets page and click an empty preset to open search
-    cy.contains("Presets").click();
-    cy.wait("@getPresets");
-    // Click an empty preset slot (preset 2 or 3)
+    // Click an empty preset slot (preset 2 or 3) to open search modal
     cy.get("[data-preset='2'], .preset-empty").first().click();
     cy.get("[role='dialog'].radio-search-modal").should("exist");
     // Must NOT be a native dialog element
@@ -76,8 +84,6 @@ describe("Preset Search Modal — layout", () => {
   });
 
   it("modal overlay has correct flexbox centering styles", () => {
-    cy.contains("Presets").click();
-    cy.wait("@getPresets");
     cy.get("[data-preset='2'], .preset-empty").first().click();
     cy.get(".radio-search-overlay").should("exist").then(($overlay) => {
       const styles = window.getComputedStyle($overlay[0]);
@@ -88,8 +94,6 @@ describe("Preset Search Modal — layout", () => {
   });
 
   it("modal is visually centered (left edge > 0)", () => {
-    cy.contains("Presets").click();
-    cy.wait("@getPresets");
     cy.get("[data-preset='2'], .preset-empty").first().click();
     cy.get(".radio-search-modal").should("exist").then(($modal) => {
       const rect = $modal[0].getBoundingClientRect();
@@ -101,8 +105,6 @@ describe("Preset Search Modal — layout", () => {
   });
 
   it("modal closes on overlay click", () => {
-    cy.contains("Presets").click();
-    cy.wait("@getPresets");
     cy.get("[data-preset='2'], .preset-empty").first().click();
     cy.get(".radio-search-modal").should("exist");
     cy.get(".radio-search-overlay").click("topLeft");
@@ -110,8 +112,6 @@ describe("Preset Search Modal — layout", () => {
   });
 
   it("modal closes on Escape key", () => {
-    cy.contains("Presets").click();
-    cy.wait("@getPresets");
     cy.get("[data-preset='2'], .preset-empty").first().click();
     cy.get(".radio-search-modal").should("exist");
     cy.get(".radio-search-overlay").type("{esc}");
@@ -136,7 +136,7 @@ const MOJIBAKE_PATTERNS = [
   "âž",   // ➕ mojibake
   "â†",   // → / ← mojibake
   "â³",   // ⏳ mojibake
-  "ðŸ"Œ", // 🔌 exact
+  "ðŸ\u201DŒ", // 🔌 exact
   "âš ï¸", // ⚠️ exact
 ];
 
@@ -151,7 +151,8 @@ function assertNoMojibake() {
 describe("Wizard Step 2 — USB Preparation (emoji rendering)", () => {
   beforeEach(() => {
     setupWizardMocks();
-    cy.visit(`${FRONTEND_BASE}/setup/wizard?step=2&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.visit(`${FRONTEND_BASE}/setup-wizard?step=2&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.wait("@getDevices");
   });
 
   it("does not render any mojibake characters", () => {
@@ -174,8 +175,8 @@ describe("Wizard Step 2 — USB Preparation (emoji rendering)", () => {
 describe("Wizard Step 3 — Power Cycle (emoji rendering)", () => {
   beforeEach(() => {
     setupWizardMocks();
-    cy.visit(`${FRONTEND_BASE}/setup/wizard?step=3&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
-    cy.wait("@checkPorts");
+    cy.visit(`${FRONTEND_BASE}/setup-wizard?step=3&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.wait("@getDevices");
   });
 
   it("does not render any mojibake characters", () => {
@@ -190,7 +191,8 @@ describe("Wizard Step 4 — Backup (emoji rendering)", () => {
       statusCode: 200,
       body: { success: true, message: "Backup OK", volumes: [], total_size_mb: 0, total_duration_seconds: 0, backup_path: "/usb/backup" },
     }).as("backup");
-    cy.visit(`${FRONTEND_BASE}/setup/wizard?step=4&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.visit(`${FRONTEND_BASE}/setup-wizard?step=4&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.wait("@getDevices");
   });
 
   it("does not render any mojibake characters", () => {
@@ -201,9 +203,8 @@ describe("Wizard Step 4 — Backup (emoji rendering)", () => {
 describe("Wizard Step 5 — Config Modification (emoji rendering)", () => {
   beforeEach(() => {
     setupWizardMocks();
-    cy.visit(`${FRONTEND_BASE}/setup/wizard?step=5&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
-    cy.wait("@serverInfo");
-    cy.wait("@detectStrategy");
+    cy.visit(`${FRONTEND_BASE}/setup-wizard?step=5&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.wait("@getDevices");
   });
 
   it("does not render any mojibake characters", () => {
@@ -227,7 +228,8 @@ describe("Wizard Step 5 — Config Modification (emoji rendering)", () => {
 describe("Wizard Step 6 — Hosts Modification (emoji rendering)", () => {
   beforeEach(() => {
     setupWizardMocks();
-    cy.visit(`${FRONTEND_BASE}/setup/wizard?step=6&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.visit(`${FRONTEND_BASE}/setup-wizard?step=6&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.wait("@getDevices");
   });
 
   it("does not render any mojibake characters", () => {
@@ -242,7 +244,8 @@ describe("Wizard Step 7 — Verification (emoji rendering)", () => {
       statusCode: 200,
       body: { success: true, resolved_ip: "192.168.1.100", expected_ip: "192.168.1.100", matches_expected: true, message: "OK" },
     }).as("verifyRedirect");
-    cy.visit(`${FRONTEND_BASE}/setup/wizard?step=7&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.visit(`${FRONTEND_BASE}/setup-wizard?step=7&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.wait("@getDevices");
   });
 
   it("does not render any mojibake characters", () => {
@@ -268,7 +271,8 @@ describe("Wizard Step 7 — Verification (emoji rendering)", () => {
 describe("Wizard Step 8 — Completion (emoji rendering)", () => {
   beforeEach(() => {
     setupWizardMocks();
-    cy.visit(`${FRONTEND_BASE}/setup/wizard?step=8&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79&deviceName=Wohnzimmer`);
+    cy.visit(`${FRONTEND_BASE}/setup-wizard?step=8&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79&deviceName=Wohnzimmer`);
+    cy.wait("@getDevices");
   });
 
   it("does not render any mojibake characters", () => {
@@ -299,7 +303,8 @@ describe("Wizard Step 8 — Completion (emoji rendering)", () => {
 describe("WizardStep base — warning icon rendering", () => {
   beforeEach(() => {
     setupWizardMocks();
-    cy.visit(`${FRONTEND_BASE}/setup/wizard?step=2&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.visit(`${FRONTEND_BASE}/setup-wizard?step=2&deviceId=DEVICE_WOHNZIMMER&deviceIp=192.168.1.79`);
+    cy.wait("@getDevices");
   });
 
   it("warning icon in WizardStep header renders correctly (⚠️ not âš ï¸)", () => {
