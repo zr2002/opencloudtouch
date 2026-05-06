@@ -135,7 +135,7 @@ async def classifier_stage(event: WebhookEvent, context: dict[str, Any]) -> Pipe
             )
 
         classification = await _try_classify(
-            openai_client, messages, model="gpt-4o-mini", cost_tracker=cost_tracker
+            openai_client, messages, model="gpt-5-nano", cost_tracker=cost_tracker
         )
 
     if classification is None:
