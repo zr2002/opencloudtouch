@@ -116,7 +116,9 @@ async def classifier_stage(event: WebhookEvent, context: dict[str, Any]) -> Pipe
     # Try GitHub Models first (free tier)
     classification = None
     if github_models_client:
-        classification = await _try_classify(github_models_client, messages)
+        classification = await _try_classify(
+            github_models_client, messages, model="gpt-4o-mini"
+        )
 
     # Fallback to OpenAI if GitHub Models failed
     if classification is None and openai_client:
@@ -132,7 +134,9 @@ async def classifier_stage(event: WebhookEvent, context: dict[str, Any]) -> Pipe
                 short_circuit=False,
             )
 
-        classification = await _try_classify(openai_client, messages, cost_tracker)
+        classification = await _try_classify(
+            openai_client, messages, model="gpt-4o-mini", cost_tracker=cost_tracker
+        )
 
     if classification is None:
         # Both providers failed
@@ -158,16 +162,17 @@ async def classifier_stage(event: WebhookEvent, context: dict[str, Any]) -> Pipe
 async def _try_classify(
     client: Any,
     messages: list[dict[str, str]],
+    model: str = "gpt-4o-mini",
     cost_tracker: Any = None,
 ) -> ClassificationResult | None:
     """Attempt classification with a single AI client. Retry once on invalid JSON."""
     for attempt in range(2):
         try:
             response = await client.chat.completions.create(
-                model="gpt-5.4-mini",
+                model=model,
                 messages=messages,
                 temperature=0.1,
-                max_tokens=200,
+                max_completion_tokens=200,
             )
 
             content = response.choices[0].message.content or ""
