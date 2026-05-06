@@ -16,6 +16,7 @@ permissions:
   issues: write
   contents: read
   discussions: read
+  models: read
 
 jobs:
   triage:
