@@ -67,16 +67,19 @@ class ConfigDiff:
 class SoundTouchConfigService:
     """Service for modifying SoundTouch device configuration."""
 
-    # Canonical config path — always edit directly (with remount rw).
-    # OverrideSdkPrivateCfg.xml is deliberately excluded: firmware on
-    # SoundTouch 10, 300 and other models ignores it entirely.
-    # See: gesellix/Bose-SoundTouch#220, scheilch/opencloudtouch#139
+    # All known config file locations on Bose devices.
+    # The FIRST found path becomes the primary (read source + write target).
+    # ALL other paths that exist are kept in sync after modification.
+    # We never know which file firmware actually reads on a given model,
+    # so we modify ALL of them to be safe.
+    # Note: OverrideSdkPrivateCfg.xml is ignored by firmware on ST10/ST300
+    # (gesellix/Bose-SoundTouch#220, scheilch/opencloudtouch#139) but we
+    # still sync it if present — never delete files on a foreign OS.
     CONFIG_CANDIDATES = [
         "/opt/Bose/etc/SoundTouchSdkPrivateCfg.xml",
+        "/mnt/nv/OverrideSdkPrivateCfg.xml",
+        "/mnt/nv/SoundTouchSdkPrivateCfg.xml",
     ]
-
-    # Stale override file that must be cleaned up (firmware ignores it)
-    _STALE_OVERRIDE = "/mnt/nv/OverrideSdkPrivateCfg.xml"
     BACKUP_DIR = "/mnt/nv"
 
     def __init__(self, ssh: SoundTouchSSHClient):
@@ -206,18 +209,39 @@ class SoundTouchConfigService:
             if not result.success:
                 self.logger.warning(f"Backup may have failed: {result.error}")
 
-    async def _cleanup_stale_override(self) -> None:
-        """Remove stale OverrideSdkPrivateCfg.xml if it exists.
+    async def _sync_all_config_files(self, content: str) -> None:
+        """Sync modified content to ALL existing config files (except the primary).
 
-        Firmware on SoundTouch 10/300 ignores this file, but its presence
-        can confuse other tools or verification checks.
+        We don't fully understand which file firmware reads on each model.
+        Rather than guess, we write the modified content to every config file
+        that exists on the device. NEVER create or delete files.
+
+        Best-effort: failure here must not abort the main modify flow.
         """
-        check = await self.ssh.execute(
-            f"test -f {self._STALE_OVERRIDE} && echo 'found' || echo 'missing'"
-        )
-        if "found" in (check.output or ""):
-            self.logger.info(f"Removing stale override: {self._STALE_OVERRIDE}")
-            await self.ssh.execute(f"rm -f {self._STALE_OVERRIDE}")
+        primary = await self._detect_config_path()
+        for candidate in self.CONFIG_CANDIDATES:
+            if candidate == primary:
+                continue
+            try:
+                check = await self.ssh.execute(
+                    f"test -f {candidate} && echo 'found' || echo 'missing'"
+                )
+                if "found" not in (check.output or ""):
+                    continue
+
+                self.logger.info(f"Syncing config: {candidate}")
+                b64 = base64.b64encode(content.encode()).decode()
+                write_cmd = (
+                    f"echo '{b64}' | base64 -d > /tmp/cfg_sync.new && "
+                    f"mv /tmp/cfg_sync.new {candidate}"
+                )
+                result = await self.ssh.execute(write_cmd)
+                if not result.success:
+                    self.logger.warning(
+                        f"Sync failed for {candidate} (best-effort): {result.error}"
+                    )
+            except Exception as e:
+                self.logger.warning(f"Sync error for {candidate} (best-effort): {e}")
 
     async def modify_bmx_url(self, oct_ip: str) -> ModifyResult:
         """Modify BMX URL (and optionally marge/swupdate) in config.
@@ -242,10 +266,6 @@ class SoundTouchConfigService:
                 config_filename = (await self._detect_config_path()).rsplit("/", 1)[-1]
                 backup_path = f"{self.BACKUP_DIR}/{config_filename}.oct-backup"
                 await self._ensure_backup(backup_path)
-
-                # 2b. Remove stale OverrideSdkPrivateCfg.xml if present
-                # (firmware ignores it, but its presence may confuse verification)
-                await self._cleanup_stale_override()
 
                 # 3. Modify XML tags
                 diff = ConfigDiff()
@@ -279,6 +299,9 @@ class SoundTouchConfigService:
 
                 # 5. Verify write
                 await self._verify_config()
+
+                # 5b. Sync ALL other config files that exist (best-effort)
+                await self._sync_all_config_files(modified)
 
                 self.logger.info(
                     f"Config modified successfully ({len(diff.changes)} tags)"
