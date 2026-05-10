@@ -73,7 +73,6 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: scheilch/opencloudtouch
   PI_GEN_REPO: https://github.com/RPi-Distro/pi-gen.git
-  PI_GEN_BRANCH: arm64
 
 jobs:
   # ============================================================================
@@ -432,7 +431,14 @@ jobs:
 
       - name: Clone pi-gen
         run: |
-          git clone --depth 1 --branch ${{ env.PI_GEN_BRANCH }} \
+          # arm64 branch only ships 64-bit kernels (kernel8.img)
+          # master branch ships 32-bit kernels (kernel7.img) needed for RPi 2
+          if [ "${{ matrix.arch }}" = "armhf" ]; then
+            PI_GEN_BRANCH=master
+          else
+            PI_GEN_BRANCH=arm64
+          fi
+          git clone --depth 1 --branch "$PI_GEN_BRANCH" \
             ${{ env.PI_GEN_REPO }} pi-gen
 
       - name: Configure pi-gen
@@ -440,7 +446,7 @@ jobs:
           cd pi-gen
           cat > config << 'EOF'
           IMG_NAME=opencloudtouch-${{ matrix.arch }}
-          RELEASE=bookworm
+          RELEASE=trixie
           TARGET_HOSTNAME=opencloudtouch
           FIRST_USER_NAME=oct
           FIRST_USER_PASS=opencloudtouch
