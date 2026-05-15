@@ -1031,8 +1031,7 @@ export interface paths {
      *
      *     Args:
      *         device_id: Device MAC address (e.g., "689E194F7D2F")
-     *         preset_repo: Preset repository dependency
-     *         recents_repo: Recents repository dependency
+     *         marge: Marge service dependency
      *
      *     Returns:
      *         XML Response with <boseAccount> structure
@@ -1059,7 +1058,7 @@ export interface paths {
      *
      *     Args:
      *         device_id: Device MAC address
-     *         preset_repo: Preset repository dependency
+     *         marge: Marge service dependency
      *
      *     Returns:
      *         XML Response with <presets> structure
@@ -1086,7 +1085,7 @@ export interface paths {
      *
      *     Args:
      *         device_id: Device MAC address
-     *         recents_repo: Recents repository dependency
+     *         marge: Marge service dependency
      *
      *     Returns:
      *         XML Response with <recents> structure
@@ -1293,11 +1292,12 @@ export interface paths {
      * @description Get full account sync via streaming endpoint.
      *
      *     This is the streaming.bose.com version of the account sync endpoint.
-     *     Returns complete account with all devices, presets, recents, and sources.
+     *     Resolves the device_id from the account_id (margeAccountUUID) stored
+     *     during device discovery, then returns that device's presets.
      *
      *     Args:
      *         account_id: Account ID (e.g., "3784726")
-     *         preset_repo: Preset repository dependency
+     *         marge: Marge service dependency
      *
      *     Returns:
      *         XML Response with <account> structure
@@ -1334,6 +1334,131 @@ export interface paths {
      *         200 OK
      */
     post: operations["scmudc_reporting_v1_scmudc__device_id__post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/streaming/stats/usage": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Streaming Stats Usage
+     * @description Accept device usage statistics (stub).
+     *
+     *     Without this endpoint, the device retries repeatedly after
+     *     statsServerUrl is redirected to OCT.
+     *
+     *     Returns:
+     *         200 OK
+     */
+    post: operations["streaming_stats_usage_streaming_stats_usage_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/streaming/device/{device_id}/streaming_token": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Streaming Token
+     * @description Return a dummy streaming token for device authentication.
+     *
+     *     SoundTouch firmware 27.x requests this token before playing a preset.
+     *     If the request fails, the device aborts playback with INVALID_SOURCE.
+     *     The token value is not validated — any non-empty response suffices.
+     *
+     *     Args:
+     *         device_id: Device MAC address
+     *
+     *     Returns:
+     *         JSON with a dummy access token
+     */
+    get: operations["streaming_token_streaming_device__device_id__streaming_token_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/blacklist/{device_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Blacklist Check
+     * @description Content blacklist check — always returns empty (nothing blacklisted).
+     *
+     *     The device checks this before playing content. If the endpoint is
+     *     unreachable, some firmware versions refuse playback.
+     *
+     *     Args:
+     *         device_id: Device MAC address
+     *
+     *     Returns:
+     *         JSON with empty blacklist
+     */
+    get: operations["blacklist_check_v1_blacklist__device_id__get"];
+    put?: never;
+    /**
+     * Blacklist Check
+     * @description Content blacklist check — always returns empty (nothing blacklisted).
+     *
+     *     The device checks this before playing content. If the endpoint is
+     *     unreachable, some firmware versions refuse playback.
+     *
+     *     Args:
+     *         device_id: Device MAC address
+     *
+     *     Returns:
+     *         JSON with empty blacklist
+     */
+    post: operations["blacklist_check_v1_blacklist__device_id__post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/setMargeAccount": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Set Marge Account
+     * @description Pair device with a Bose Cloud account (stub).
+     *
+     *     The SoundTouch app calls this to associate a device with an account.
+     *     OCT doesn't use real cloud accounts, but the device expects a 200 OK.
+     *     The actual margeAccountUUID is set via Telnet or device-side API.
+     *
+     *     Returns:
+     *         200 OK with status XML
+     */
+    post: operations["set_marge_account_setMargeAccount_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1457,7 +1582,7 @@ export interface paths {
     put?: never;
     /**
      * Check Connectivity
-     * @description Check if device is ready for setup (SSH/Telnet available).
+     * @description Check if device is ready for setup (SSH available).
      *
      *     This should be called after user inserts USB stick and reboots device.
      */
@@ -1623,7 +1748,7 @@ export interface paths {
     put?: never;
     /**
      * Wizard Check Ports
-     * @description Check if SSH/Telnet ports accessible (Wizard Step 3).
+     * @description Check if SSH port is accessible (Wizard Step 3).
      */
     post: operations["wizard_check_ports_api_setup_wizard_check_ports_post"];
     delete?: never;
@@ -1764,12 +1889,84 @@ export interface paths {
     /**
      * Wizard Reboot Device
      * @description Reboot SoundTouch device via SSH (Wizard Step 7).
-     *
-     *     Sends the `reboot` command via SSH. The device drops the SSH connection
-     *     immediately after receiving the command — this is expected and not an error.
-     *     Frontend should wait ~60s before attempting verify-redirect tests.
      */
     post: operations["wizard_reboot_device_api_setup_wizard_reboot_device_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/setup/wizard/account-pairing": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Wizard Account Pairing
+     * @description Ensure device has a margeAccountUUID (Wizard Step - Account Pairing).
+     *
+     *     Checks if the device already has a UUID. If not, generates one and
+     *     sets it via Telnet. Persists the UUID in the device repository for
+     *     streaming endpoint resolution.
+     */
+    post: operations["wizard_account_pairing_api_setup_wizard_account_pairing_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/setup/wizard/ensure-account": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Wizard Ensure Account
+     * @description Ensure device has a margeAccountUUID (Wizard Step � after config/hosts).
+     *
+     *     Devices without a margeAccountUUID cannot play presets (INVALID_SOURCE).
+     *     This endpoint checks GET :8090/info and sets a UUID via Telnet if missing.
+     *
+     *     Safe to call multiple times � no-op if UUID already present.
+     */
+    post: operations["wizard_ensure_account_api_setup_wizard_ensure_account_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/setup/wizard/init-persistence": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Wizard Init Persistence
+     * @description Initialize persistence files on factory-reset devices (Wizard Step — after account pairing).
+     *
+     *     Factory-reset devices lack SystemConfigurationDB.xml and Sources.xml.
+     *     Without them, the firmware never fully initialises playback state,
+     *     causing INVALID_SOURCE on preset recall (GitHub Issue #167).
+     *
+     *     Only creates files that are missing — never overwrites existing ones.
+     *     Safe to call multiple times.
+     */
+    post: operations["wizard_init_persistence_api_setup_wizard_init_persistence_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1788,9 +1985,6 @@ export interface paths {
     /**
      * Wizard Complete
      * @description Mark wizard setup as complete for a device.
-     *
-     *     Updates the device's setup_status to 'configured' in the database.
-     *     Called by the frontend when the user finishes the wizard.
      */
     post: operations["wizard_complete_api_setup_wizard_complete_post"];
     delete?: never;
@@ -1811,9 +2005,6 @@ export interface paths {
     /**
      * Wizard Verify Redirect
      * @description Verify a domain is redirected to OCT on the device (Wizard Step 7).
-     *
-     *     SSH into the device, run ping against the domain, and check whether
-     *     the resolved IP matches the OCT server's IP.
      */
     post: operations["wizard_verify_redirect_api_setup_wizard_verify_redirect_post"];
     delete?: never;
@@ -1833,8 +2024,8 @@ export interface paths {
      * Firmware Index
      * @description Return firmware INDEX.XML for SoundTouch devices.
      *
-     *     The device checks this endpoint at boot and periodically
-     *     to determine if a firmware update is available.
+     *     Serves the original Bose worldwide.bose.com index so devices recognise
+     *     their current firmware as up-to-date and don't attempt downloads.
      */
     get: operations["firmware_index_updates_soundtouch_get"];
     put?: never;
@@ -1853,18 +2044,10 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Firmware Download
-     * @description Redirect firmware download to device.
-     *
-     *     Firmware files are large (100+ MB). Instead of hosting them,
-     *     we return a 404 — OCT intentionally does NOT serve firmware
-     *     updates to prevent devices from updating to versions that
-     *     might break OCT compatibility.
-     *
-     *     In the future, this could proxy to archive.org for
-     *     specific firmware versions needed for downgrading.
+     * Firmware Download Legacy
+     * @description Block legacy firmware download path.
      */
-    get: operations["firmware_download_ced_eup_downloads_rel__filename__get"];
+    get: operations["firmware_download_legacy_ced_eup_downloads_rel__filename__get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1882,8 +2065,11 @@ export interface paths {
     };
     /**
      * Firmware Download
-     * @description Block real Bose firmware download path (Stockholm devices).
-     *     Returns 404 to prevent unintended firmware updates.
+     * @description Block real Bose firmware download path.
+     *
+     *     The real index XML references https://downloads.bose.com/ced/soundtouch/...
+     *     but since swUpdateUrl points to OCT, the device may try to fetch from here.
+     *     We return 404 to prevent unintended firmware updates.
      */
     get: operations["firmware_download_ced_soundtouch_downloads_stockholm__path__get"];
     put?: never;
@@ -2002,26 +2188,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/health": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Health Check
-     * @description Health check endpoint for Docker and monitoring.
-     */
-    get: operations["health_check_health_get"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/logs/level": {
     parameters: {
       query?: never;
@@ -2048,16 +2214,16 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Download Backend Log
-     * @description Returns the in-memory backend log as a plain-text file download.
+     * Download backend log buffer (without frontend logs)
+     * @description Returns backend logs only. Use POST to include frontend console logs.
      */
-    get: operations["download_backend_log_api_logs_backend_get"];
+    get: operations["download_backend_logs_get_api_logs_backend_get"];
     put?: never;
     /**
-     * Download Logs with Frontend Console
-     * @description Returns backend + frontend console logs as a plain-text file download.
+     * Download backend + frontend logs
+     * @description Returns backend logs with frontend console logs included.
      */
-    post: operations["download_backend_log_api_logs_backend_post"];
+    post: operations["download_backend_logs_post_api_logs_backend_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2074,10 +2240,10 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Submit Bug Report
-     * @description Submit a bug report that creates a GitHub issue with diagnostic data.
+     * Create Bug Report
+     * @description Create a bug report as a GitHub Issue with auto-collected diagnostics.
      */
-    post: operations["submit_bug_report_api_bug_report_post"];
+    post: operations["create_bug_report_api_bug_report_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2095,7 +2261,9 @@ export interface paths {
     put?: never;
     /**
      * Download Diagnostics
-     * @description Download a gzipped diagnostic bundle without requiring a GitHub token.
+     * @description Download a gzipped diagnostic bundle — works without GitHub token.
+     *
+     *     The user can drag-drop the .log.gz file into a manually created GitHub issue.
      */
     post: operations["download_diagnostics_api_bug_report_diagnostics_post"];
     delete?: never;
@@ -2155,9 +2323,29 @@ export interface paths {
     put?: never;
     /**
      * Post Config Snapshot
-     * @description Store a config XML snapshot for audit purposes.
+     * @description Store a config XML snapshot.
      */
     post: operations["post_config_snapshot_api_wizard_config_snapshot_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Health Check
+     * @description Health check endpoint for Docker and monitoring.
+     */
+    get: operations["health_check_health_get"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2168,18 +2356,110 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
-    /** LogLevelResponse */
-    LogLevelResponse: {
-      /** Level */
-      level: string;
-    };
-    /** LogLevelRequest */
-    LogLevelRequest: {
+    /**
+     * AccountPairingRequest
+     * @description Request to ensure device has a margeAccountUUID.
+     */
+    AccountPairingRequest: {
       /**
-       * Level
-       * @enum {string}
+       * Device Ip
+       * @description Device IP address
        */
-      level: "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+      device_ip: string;
+      /**
+       * Device Id
+       * @description Device ID (MAC address)
+       */
+      device_id: string;
+    };
+    /**
+     * AccountPairingResponse
+     * @description Response from account pairing.
+     */
+    AccountPairingResponse: {
+      /** Success */
+      success: boolean;
+      /**
+       * Had Uuid
+       * @description True if UUID was already present
+       * @default false
+       */
+      had_uuid: boolean;
+      /**
+       * Uuid
+       * @description The current or newly set UUID
+       * @default
+       */
+      uuid: string;
+      /**
+       * Message
+       * @default
+       */
+      message: string;
+    };
+    /**
+     * AuditBatchRequest
+     * @description Batch of audit entries (reduces HTTP roundtrips).
+     */
+    AuditBatchRequest: {
+      /** Entries */
+      entries: components["schemas"]["AuditEntryRequest"][];
+    };
+    /**
+     * AuditBatchResponse
+     * @description Response for batch creation.
+     */
+    AuditBatchResponse: {
+      /** Success */
+      success: boolean;
+      /** Count */
+      count: number;
+    };
+    /**
+     * AuditEntryRequest
+     * @description Single wizard audit log entry from the frontend.
+     */
+    AuditEntryRequest: {
+      /**
+       * Device Id
+       * @description Device MAC/ID
+       */
+      device_id: string;
+      /**
+       * Category
+       * @description Event category: user_action, device_info, api_call, config_change, step_transition, checkbox, dropdown, error
+       */
+      category: string;
+      /**
+       * Event
+       * @description Short event name, e.g. 'button_click:next'
+       */
+      event: string;
+      /**
+       * Step
+       * @description Wizard step number (0=init)
+       */
+      step?: number | null;
+      /**
+       * Detail
+       * @description JSON-encoded extra data (free-form)
+       */
+      detail?: string | null;
+      /**
+       * Timestamp
+       * @description ISO-8601 timestamp from frontend
+       */
+      timestamp?: string | null;
+    };
+    /**
+     * AuditEntryResponse
+     * @description Response for single entry creation.
+     */
+    AuditEntryResponse: {
+      /** Success */
+      success: boolean;
+      /** Id */
+      id: number;
     };
     /**
      * BackupRequest
@@ -2191,9 +2471,8 @@ export interface components {
       /**
        * Device Id
        * @description Device identifier for unique backup filenames
-       * @default null
        */
-      device_id: string | null;
+      device_id?: string | null;
     };
     /**
      * BackupResponse
@@ -2217,26 +2496,6 @@ export interface components {
        */
       total_duration_seconds: number;
     };
-    /** BugReportRequest */
-    BugReportRequest: {
-      description: string;
-      steps_to_reproduce: string;
-      expected_behavior: string;
-      installation_type: string;
-      hardware: string;
-      /** @default [] */
-      soundtouch_devices: string[];
-      /** @default  */
-      other_installation: string;
-      /** @default  */
-      other_hardware: string;
-    };
-    /** BugReportResponse */
-    BugReportResponse: {
-      issue_url?: string;
-      issue_number?: number;
-      message?: string;
-    };
     /** Body_set_mute_api_devices__device_id__mute_put */
     Body_set_mute_api_devices__device_id__mute_put: {
       /** Muted */
@@ -2246,6 +2505,79 @@ export interface components {
     Body_set_volume_api_devices__device_id__volume_put: {
       /** Level */
       level: number;
+    };
+    /** BugReportRequest */
+    BugReportRequest: {
+      /** Description */
+      description: string;
+      /** Steps To Reproduce */
+      steps_to_reproduce: string;
+      /** Expected Behavior */
+      expected_behavior: string;
+      /** Installation Type */
+      installation_type: string;
+      /** Hardware */
+      hardware: string;
+      /**
+       * Soundtouch Devices
+       * @default []
+       */
+      soundtouch_devices: string[];
+      /**
+       * Network Config
+       * @default
+       */
+      network_config: string;
+      /**
+       * Additional Info
+       * @default
+       */
+      additional_info: string;
+      /**
+       * Other Installation
+       * @default
+       */
+      other_installation: string;
+      /**
+       * Other Hardware
+       * @default
+       */
+      other_hardware: string;
+      /**
+       * Other Device
+       * @default
+       */
+      other_device: string;
+      /**
+       * Screenshot Data Url
+       * @default
+       */
+      screenshot_data_url: string;
+      /**
+       * Frontend Logs
+       * @default []
+       */
+      frontend_logs: Record<string, never>[];
+      /**
+       * Browser Info
+       * @default
+       */
+      browser_info: string;
+      /**
+       * Current Route
+       * @default
+       */
+      current_route: string;
+      /**
+       * Click Timestamp
+       * @default 0
+       */
+      click_timestamp: number;
+    };
+    /** BugReportResponse */
+    BugReportResponse: {
+      /** Issue Url */
+      issue_url: string;
     };
     /**
      * ChangeMasterRequest
@@ -2299,6 +2631,41 @@ export interface components {
       new_url: string;
     };
     /**
+     * ConfigSnapshotRequest
+     * @description Request to store a config XML snapshot.
+     */
+    ConfigSnapshotRequest: {
+      /** Device Id */
+      device_id: string;
+      /**
+       * File Path
+       * @description Config file path on device
+       */
+      file_path: string;
+      /**
+       * Content
+       * @description Full XML content
+       */
+      content: string;
+      /**
+       * Trigger
+       * @description What caused the snapshot, e.g. 'before_modify'
+       */
+      trigger?: string | null;
+      /** Timestamp */
+      timestamp?: string | null;
+    };
+    /**
+     * ConfigSnapshotResponse
+     * @description Response for snapshot creation.
+     */
+    ConfigSnapshotResponse: {
+      /** Success */
+      success: boolean;
+      /** Id */
+      id: number;
+    };
+    /**
      * ConnectivityCheckRequest
      * @description Request to check device connectivity.
      */
@@ -2335,6 +2702,37 @@ export interface components {
       message: string;
     };
     /**
+     * DiagnosticsRequest
+     * @description Request body for diagnostics download (no GitHub token needed).
+     */
+    DiagnosticsRequest: {
+      /**
+       * Frontend Logs
+       * @default []
+       */
+      frontend_logs: Record<string, never>[];
+      /**
+       * Description
+       * @default
+       */
+      description: string;
+      /**
+       * Browser Info
+       * @default
+       */
+      browser_info: string;
+      /**
+       * Current Route
+       * @default
+       */
+      current_route: string;
+      /**
+       * Click Timestamp
+       * @default 0
+       */
+      click_timestamp: number;
+    };
+    /**
      * EnablePermanentSSHRequest
      * @description Request to enable permanent SSH access on device.
      */
@@ -2355,6 +2753,27 @@ export interface components {
        * @default true
        */
       make_permanent: boolean;
+    };
+    /**
+     * FrontendLogEntry
+     * @description A single frontend console log entry.
+     */
+    FrontendLogEntry: {
+      /**
+       * Timestamp
+       * @default
+       */
+      timestamp: string;
+      /**
+       * Level
+       * @default
+       */
+      level: string;
+      /**
+       * Message
+       * @default
+       */
+      message: string;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -2400,6 +2819,46 @@ export interface components {
       diff: string;
     };
     /**
+     * InitPersistenceRequest
+     * @description Request to initialize persistence files on a factory-reset device.
+     */
+    InitPersistenceRequest: {
+      /**
+       * Device Ip
+       * @description Device IP address
+       */
+      device_ip: string;
+      /**
+       * Device Name
+       * @description Device name from GET :8090/info <name>
+       */
+      device_name: string;
+      /**
+       * Account Uuid
+       * @description margeAccountUUID (7-digit numeric, from account pairing)
+       */
+      account_uuid: string;
+    };
+    /**
+     * InitPersistenceResponse
+     * @description Response from persistence initialization.
+     */
+    InitPersistenceResponse: {
+      /** Success */
+      success: boolean;
+      /** Created Files */
+      created_files?: string[];
+      /** Skipped Files */
+      skipped_files?: string[];
+      /**
+       * Message
+       * @default
+       */
+      message: string;
+      /** Error */
+      error?: string | null;
+    };
+    /**
      * ListBackupsRequest
      * @description Request to list backups.
      */
@@ -2418,6 +2877,36 @@ export interface components {
       config_backups?: string[];
       /** Hosts Backups */
       hosts_backups?: string[];
+    };
+    /**
+     * LogDownloadRequest
+     * @description Optional body for POST /api/logs/backend with frontend logs.
+     */
+    LogDownloadRequest: {
+      /**
+       * Frontend Logs
+       * @default []
+       */
+      frontend_logs: components["schemas"]["FrontendLogEntry"][];
+    };
+    /**
+     * LogLevelRequest
+     * @description Request to change the log level at runtime.
+     */
+    LogLevelRequest: {
+      /**
+       * Level
+       * @enum {string}
+       */
+      level: "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+    };
+    /**
+     * LogLevelResponse
+     * @description Current log level.
+     */
+    LogLevelResponse: {
+      /** Level */
+      level: string;
     };
     /**
      * ManualIPsResponse
@@ -2440,7 +2929,7 @@ export interface components {
     };
     /**
      * PortCheckRequest
-     * @description Request to check SSH/Telnet ports.
+     * @description Request to check SSH port.
      */
     PortCheckRequest: {
       /** Device Ip */
@@ -2640,7 +3129,10 @@ export interface components {
       /** Expected Ip */
       expected_ip: string;
     };
-    /** VerifyRedirectResponse */
+    /**
+     * VerifyRedirectResponse
+     * @description Response with domain redirect verification result.
+     */
     VerifyRedirectResponse: {
       /** Success */
       success: boolean;
@@ -2663,117 +3155,6 @@ export interface components {
       matches_expected: boolean;
       /** Message */
       message: string;
-    };
-    /** DiagnosticsRequest */
-    DiagnosticsRequest: {
-      /**
-       * Frontend Logs
-       * @default []
-       */
-      frontend_logs: Record<string, never>[];
-      /**
-       * Description
-       * @default
-       */
-      description: string;
-      /**
-       * Browser Info
-       * @default
-       */
-      browser_info: string;
-      /**
-       * Current Route
-       * @default
-       */
-      current_route: string;
-      /**
-       * Click Timestamp
-       * @default 0
-       */
-      click_timestamp: number;
-    };
-    /** AuditEntryRequest */
-    AuditEntryRequest: {
-      /** Device Id */
-      device_id: string;
-      /** Category */
-      category: string;
-      /** Event */
-      event: string;
-      /** Step */
-      step?: number;
-      /** Detail */
-      detail?: string;
-      /** Timestamp */
-      timestamp?: string;
-    };
-    /** AuditEntryResponse */
-    AuditEntryResponse: {
-      /** Success */
-      success: boolean;
-      /** Id */
-      id: number;
-    };
-    /** AuditBatchRequest */
-    AuditBatchRequest: {
-      /** Entries */
-      entries: components["schemas"]["AuditEntryRequest"][];
-    };
-    /** AuditBatchResponse */
-    AuditBatchResponse: {
-      /** Success */
-      success: boolean;
-      /** Count */
-      count: number;
-    };
-    /** ConfigSnapshotRequest */
-    ConfigSnapshotRequest: {
-      /** Device Id */
-      device_id: string;
-      /** File Path */
-      file_path: string;
-      /** Content */
-      content: string;
-      /** Trigger */
-      trigger?: string;
-      /** Timestamp */
-      timestamp?: string;
-    };
-    /** ConfigSnapshotResponse */
-    ConfigSnapshotResponse: {
-      /** Success */
-      success: boolean;
-      /** Id */
-      id: number;
-    };
-    /** FrontendLogEntry */
-    FrontendLogEntry: {
-      /**
-       * Timestamp
-       * @default
-       */
-      timestamp: string;
-      /**
-       * Level
-       * @default
-       */
-      level: string;
-      /**
-       * Message
-       * @default
-       */
-      message: string;
-    };
-    /**
-     * LogDownloadRequest
-     * @description Response with domain redirect verification result.
-     */
-    LogDownloadRequest: {
-      /**
-       * Frontend Logs
-       * @default []
-       */
-      frontend_logs: components["schemas"]["FrontendLogEntry"][];
     };
     /**
      * WizardCompleteRequest
@@ -4449,6 +4830,139 @@ export interface operations {
       };
     };
   };
+  streaming_stats_usage_streaming_stats_usage_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  streaming_token_streaming_device__device_id__streaming_token_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        device_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  blacklist_check_v1_blacklist__device_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        device_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  blacklist_check_v1_blacklist__device_id__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        device_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  set_marge_account_setMargeAccount_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
   get_playlist_m3u_playlist__device_id___preset_number__m3u_get: {
     parameters: {
       query?: never;
@@ -5018,6 +5532,105 @@ export interface operations {
       };
     };
   };
+  wizard_account_pairing_api_setup_wizard_account_pairing_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AccountPairingRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AccountPairingResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  wizard_ensure_account_api_setup_wizard_ensure_account_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AccountPairingRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AccountPairingResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  wizard_init_persistence_api_setup_wizard_init_persistence_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InitPersistenceRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InitPersistenceResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   wizard_complete_api_setup_wizard_complete_post: {
     parameters: {
       query?: never;
@@ -5104,7 +5717,7 @@ export interface operations {
       };
     };
   };
-  firmware_download_ced_eup_downloads_rel__filename__get: {
+  firmware_download_legacy_ced_eup_downloads_rel__filename__get: {
     parameters: {
       query?: never;
       header?: never;
@@ -5183,6 +5796,13 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["ZoneStatus"][];
         };
+      };
+      /** @description Failed to get zones */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
@@ -5382,26 +6002,6 @@ export interface operations {
       };
     };
   };
-  health_check_health_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-    };
-  };
   get_log_level_api_logs_level_get: {
     parameters: {
       query?: never;
@@ -5411,7 +6011,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Current log level */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
@@ -5435,7 +6035,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Updated log level */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
@@ -5451,9 +6051,18 @@ export interface operations {
         };
         content?: never;
       };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
   };
-  download_backend_log_api_logs_backend_get: {
+  download_backend_logs_get_api_logs_backend_get: {
     parameters: {
       query?: never;
       header?: never;
@@ -5462,7 +6071,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Plain-text log file download */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
@@ -5473,7 +6082,7 @@ export interface operations {
       };
     };
   };
-  download_backend_log_api_logs_backend_post: {
+  download_backend_logs_post_api_logs_backend_post: {
     parameters: {
       query?: never;
       header?: never;
@@ -5486,7 +6095,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Plain-text log file download */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
@@ -5495,9 +6104,18 @@ export interface operations {
           "text/plain": string;
         };
       };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
   };
-  submit_bug_report_api_bug_report_post: {
+  create_bug_report_api_bug_report_post: {
     parameters: {
       query?: never;
       header?: never;
@@ -5510,7 +6128,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Bug report submitted successfully */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
@@ -5519,12 +6137,14 @@ export interface operations {
           "application/json": components["schemas"]["BugReportResponse"];
         };
       };
-      /** @description GitHub token not configured */
-      503: {
+      /** @description Validation Error */
+      422: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
       };
     };
   };
@@ -5541,13 +6161,22 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Gzipped diagnostic log file */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/gzip": string;
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -5565,7 +6194,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Entry recorded */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
@@ -5574,12 +6203,14 @@ export interface operations {
           "application/json": components["schemas"]["AuditEntryResponse"];
         };
       };
-      /** @description Wizard audit repository not initialized */
-      503: {
+      /** @description Validation Error */
+      422: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
       };
     };
   };
@@ -5596,7 +6227,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Batch recorded */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
@@ -5605,12 +6236,14 @@ export interface operations {
           "application/json": components["schemas"]["AuditBatchResponse"];
         };
       };
-      /** @description Wizard audit repository not initialized */
-      503: {
+      /** @description Validation Error */
+      422: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
       };
     };
   };
@@ -5627,7 +6260,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Snapshot stored */
+      /** @description Successful Response */
       200: {
         headers: {
           [name: string]: unknown;
@@ -5636,12 +6269,34 @@ export interface operations {
           "application/json": components["schemas"]["ConfigSnapshotResponse"];
         };
       };
-      /** @description Wizard audit repository not initialized */
-      503: {
+      /** @description Validation Error */
+      422: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  health_check_health_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
       };
     };
   };

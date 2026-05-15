@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 
 # Hostname: letters, digits, hyphens, dots — NO shell metacharacters
 _HOSTNAME_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,253}[a-zA-Z0-9])?$")
+_DEVICE_IP_DESC = "Device IP address"
 
 
 def _validate_ip_field(v: str) -> str:
@@ -43,7 +44,7 @@ class EnablePermanentSSHRequest(BaseModel):
     """Request to enable permanent SSH access on device."""
 
     device_id: str = Field(..., description="Device ID")
-    ip: str = Field(..., description="Device IP address")
+    ip: str = Field(..., description=_DEVICE_IP_DESC)
     make_permanent: bool = Field(
         default=True, description="Copy remote_services to /mnt/nv/ for persistence"
     )
@@ -295,7 +296,7 @@ class DetectStrategyResponse(BaseModel):
 class AccountPairingRequest(BaseModel):
     """Request to ensure device has a margeAccountUUID."""
 
-    device_ip: str = Field(..., description="Device IP address")
+    device_ip: str = Field(..., description=_DEVICE_IP_DESC)
     device_id: str = Field(..., description="Device ID (MAC address)")
 
 
@@ -307,6 +308,29 @@ class AccountPairingResponse(BaseModel):
         default=False, description="True if UUID was already present"
     )
     uuid: str = Field(default="", description="The current or newly set UUID")
+    message: str = ""
+
+
+class InitPersistenceRequest(BaseModel):
+    """Request to initialize persistence files on a factory-reset device."""
+
+    device_ip: str = Field(..., description=_DEVICE_IP_DESC)
+    device_name: str = Field(
+        max_length=100,
+        description="Device name from GET :8090/info <name>",
+    )
+    account_uuid: str = Field(
+        pattern=r"^\d{1,10}$",
+        description="margeAccountUUID (7-digit numeric, from account pairing)",
+    )
+
+
+class InitPersistenceResponse(BaseModel):
+    """Response from persistence initialization."""
+
+    success: bool
+    created_files: list[str] = Field(default_factory=list)
+    skipped_files: list[str] = Field(default_factory=list)
     message: str = ""
     error: Optional[str] = None
 

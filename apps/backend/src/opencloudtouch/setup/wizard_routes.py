@@ -23,6 +23,8 @@ from opencloudtouch.setup.api_models import (
     DetectStrategyResponse,
     EnsureAccountRequest,
     EnsureAccountResponse,
+    InitPersistenceRequest,
+    InitPersistenceResponse,
     HostsModifyRequest,
     HostsModifyResponse,
     ListBackupsRequest,
@@ -38,7 +40,7 @@ from opencloudtouch.setup.api_models import (
     AccountPairingRequest,
     AccountPairingResponse,
 )
-from opencloudtouch.setup.wizard_helpers import check_port_443
+from opencloudtouch.setup.wizard_helpers import check_port_443, ssh_operation
 from opencloudtouch.setup.wizard_service import WizardService
 
 logger = logging.getLogger(__name__)
@@ -333,6 +335,53 @@ async def wizard_ensure_account(request: EnsureAccountRequest):
         success=True,
         had_uuid=result.had_uuid,
         uuid=result.uuid,
+        message=result.message,
+    )
+
+
+@wizard_router.post("/wizard/init-persistence", response_model=InitPersistenceResponse)
+async def wizard_init_persistence(request: InitPersistenceRequest):
+    """Initialize persistence files on factory-reset devices (Wizard Step — after account pairing).
+
+    Factory-reset devices lack SystemConfigurationDB.xml and Sources.xml.
+    Without them, the firmware never fully initialises playback state,
+    causing INVALID_SOURCE on preset recall (GitHub Issue #167).
+
+    Only creates files that are missing — never overwrites existing ones.
+    Safe to call multiple times.
+    """
+    from opencloudtouch.setup.persistence_service import ensure_persistence_files
+
+    logger.info(
+        "Initializing persistence files on %s (name=%s, uuid=%s)",
+        request.device_ip,
+        request.device_name,
+        request.account_uuid,
+    )
+
+    async with ssh_operation(request.device_ip, "init-persistence") as ssh:
+        # Remount rw for file creation
+        await ssh.execute("mount -o remount,rw /")
+        try:
+            result = await ensure_persistence_files(
+                ssh=ssh,
+                device_name=request.device_name,
+                account_uuid=request.account_uuid,
+            )
+        finally:
+            await ssh.execute("sync")
+            await ssh.execute("mount -o remount,ro /")
+
+    if not result.success:
+        return InitPersistenceResponse(
+            success=False,
+            message=result.error or "Persistence initialization failed",
+        )
+
+    return InitPersistenceResponse(
+        success=True,
+        created_files=result.created_files,
+        skipped_files=result.skipped_files,
         message=result.message,
     )
 
