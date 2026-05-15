@@ -91,7 +91,7 @@ async def _write_file_atomic(ssh: SoundTouchSSHClient, path: str, content: str) 
     """Write content to device atomically via base64 piping."""
     b64 = base64.b64encode(content.encode()).decode()
     write_cmd = (
-        f"echo '{b64}' | base64 -d > /tmp/persist.new && " f"mv /tmp/persist.new {path}"
+        f"echo '{b64}' | base64 -d > /tmp/persist.new && mv /tmp/persist.new {path}"
     )
     result = await ssh.execute(write_cmd)
     if not result.success:
