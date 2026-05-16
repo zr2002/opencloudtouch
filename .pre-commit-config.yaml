@@ -89,6 +89,17 @@ repos:
   - repo: local
     hooks:
       # ========================================================================
+      # GUARD: Abort if formatters modified files (no point running tests)
+      # ========================================================================
+      - id: check-reformatted
+        name: "Guard: abort if formatters changed files"
+        entry: bash scripts/hooks/check-reformatted.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      # ========================================================================
       # PRE-COMMIT: UNIT TESTS ONLY (fast, <60s)
       # ========================================================================
 
