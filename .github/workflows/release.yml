@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # RELEASE WORKFLOW - Tag + GitHub Release pipeline
 #
 # Trigger: workflow_dispatch with release_type choice (patch/minor/major)
@@ -389,6 +389,9 @@ jobs:
   build-images:
     name: Build Images
     needs: [gh-release, tag]
+    permissions:
+      packages: write
+      contents: write
     uses: ./.github/workflows/build-images.yml
     with:
       version: ${{ needs.gh-release.outputs.version }}
