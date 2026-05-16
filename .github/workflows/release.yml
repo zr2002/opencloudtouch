@@ -422,7 +422,8 @@ jobs:
           TAG="v${VERSION}"
           echo "Image build succeeded — publishing release ${TAG}..."
 
-          RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases/tags/${TAG}" --jq '.id')
+          RELEASE_ID=$(gh api "repos/scheilch/opencloudtouch/releases" \
+            --jq ".[] | select(.tag_name == \"${TAG}\") | .id")
 
           gh api "repos/${{ github.repository }}/releases/${RELEASE_ID}" \
             --method PATCH \
