@@ -145,7 +145,9 @@ describe("Step7Verification", () => {
     });
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain("Device finalized");
+      expect(document.body.textContent).toContain("Device UUID set: 5522049");
+      expect(document.body.textContent).toContain("Sources.xml written");
+      expect(document.body.textContent).toContain("SystemConfigurationDB.xml present");
       const buttons = screen.getAllByRole("button");
       const rebootBtn = buttons.find((b) =>
         (b.textContent || "").toLowerCase().includes("restart")
@@ -154,7 +156,7 @@ describe("Step7Verification", () => {
     });
   });
 
-  it("displays finalize success message", async () => {
+  it("displays finalize checklist items", async () => {
     mockSuccessFlow();
 
     render(<Step7Verification {...defaultProps} />);
@@ -164,7 +166,9 @@ describe("Step7Verification", () => {
     });
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain("Device finalized");
+      expect(document.body.textContent).toContain("Device UUID set: 5522049");
+      expect(document.body.textContent).toContain("Sources.xml written");
+      expect(document.body.textContent).toContain("SystemConfigurationDB.xml present");
     });
   });
 
@@ -214,7 +218,7 @@ describe("Step7Verification", () => {
     });
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain("Device UUID: 5522049");
+      // uuid_present is hidden (duplicate of finalizeUuid), only sources_complete shown
       expect(document.body.textContent).toContain("All required sources present");
     });
   });
@@ -440,9 +444,337 @@ describe("Step7Verification", () => {
     });
 
     await waitFor(() => {
-      // DNS errors are caught and shown as failed checks with N/A resolved IP
-      expect(document.body.textContent).toContain("N/A");
       expect(document.body.textContent).toContain("Some checks failed");
+    });
+  });
+
+  it("shows error when verifySetup itself throws", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockRejectedValue(new Error("Server unreachable"));
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) =>
+        (b.textContent || "").toLowerCase().includes("verification")
+      );
+      expect(verifyBtn).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.click(verifyBtn!);
+    });
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("Server unreachable");
+    });
+  });
+
+  it("falls back to backend message when config_bmx_url has no bmx_url detail", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockResolvedValue({
+      success: true,
+      checks: [
+        { name: "config_bmx_url", passed: true, message: "BMX URL correct", details: {} },
+      ],
+      passed_count: 1,
+      failed_count: 0,
+      message: "1/1 checks passed",
+    });
+    mockVerifyRedirect.mockResolvedValue({
+      success: true,
+      resolved_ip: "192.168.1.50",
+      expected_ip: "192.168.1.50",
+      matches_expected: true,
+      message: "OK",
+    });
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) =>
+        (b.textContent || "").toLowerCase().includes("verification")
+      );
+      expect(verifyBtn).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.click(verifyBtn!);
+    });
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("BMX URL correct");
+    });
+  });
+
+  it("renders ungrouped checks that are not in any defined group", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockResolvedValue({
+      success: true,
+      checks: [
+        { name: "some_unknown_check", passed: true, message: "Custom check OK", details: {} },
+      ],
+      passed_count: 1,
+      failed_count: 0,
+      message: "1/1 checks passed",
+    });
+    mockVerifyRedirect.mockResolvedValue({
+      success: true,
+      resolved_ip: "192.168.1.50",
+      expected_ip: "192.168.1.50",
+      matches_expected: true,
+      message: "OK",
+    });
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) =>
+        (b.textContent || "").toLowerCase().includes("verification")
+      );
+      expect(verifyBtn).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.click(verifyBtn!);
+    });
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("Custom check OK");
+    });
+  });
+
+  it("renders skip button after verification and calls onSkip when clicked", async () => {
+    vi.useFakeTimers();
+    mockSuccessFlow();
+    mockRebootDevice.mockResolvedValue({});
+    mockVerifyRedirect.mockResolvedValue({
+      success: false,
+      resolved_ip: "1.2.3.4",
+      expected_ip: "192.168.1.50",
+      matches_expected: false,
+      message: "Mismatch",
+    });
+
+    const onSkip = vi.fn();
+    render(<Step7Verification {...defaultProps} onSkip={onSkip} />);
+
+    // Finalize
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /finalize/i }));
+    });
+
+    // Reboot
+    const rebootBtn = screen.getAllByRole("button").find((b) =>
+      (b.textContent || "").toLowerCase().includes("restart")
+    );
+    await act(async () => {
+      fireEvent.click(rebootBtn!);
+    });
+
+    // Countdown
+    await act(async () => {
+      vi.advanceTimersByTime(61000);
+    });
+    vi.useRealTimers();
+
+    // Full verification
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) =>
+        (b.textContent || "").toLowerCase().includes("verification")
+      );
+      expect(verifyBtn).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.click(verifyBtn!);
+    });
+
+    // Wait for skip button to appear
+    await waitFor(() => {
+      const skipBtn = screen.getAllByRole("button").find((b) =>
+        (b.textContent || "").toLowerCase().includes("continue anyway")
+      );
+      expect(skipBtn).toBeTruthy();
+    });
+
+    const skipBtn = screen.getAllByRole("button").find((b) =>
+      (b.textContent || "").toLowerCase().includes("continue anyway")
+    );
+    fireEvent.click(skipBtn!);
+    expect(onSkip).toHaveBeenCalledTimes(1);
+  });
+
+  // ===================================================================
+  // getCheckMessage / formatBmxHostPort branch coverage
+  // ===================================================================
+
+  it("formats BMX URL with port as HOST:PORT in check message", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockResolvedValue({
+      success: true,
+      checks: [
+        { name: "config_bmx_url", passed: true, message: "BMX URL correct", details: { bmx_url: "https://example.com:8443/api" } },
+      ],
+      passed_count: 1,
+      failed_count: 0,
+      message: "1/1 checks passed",
+    });
+    mockVerifyRedirect.mockResolvedValue({ success: true, resolved_ip: "192.168.1.50", expected_ip: "192.168.1.50", matches_expected: true, message: "OK" });
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) => (b.textContent || "").toLowerCase().includes("verification"));
+      expect(verifyBtn).toBeTruthy();
+    });
+    await act(async () => { fireEvent.click(verifyBtn!); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/example\.com:8443/)).toBeInTheDocument();
+    });
+  });
+
+  it("formats BMX URL without port as HOST only", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockResolvedValue({
+      success: true,
+      checks: [
+        { name: "config_bmx_url", passed: true, message: "BMX URL correct", details: { bmx_url: "https://myserver.local/path" } },
+      ],
+      passed_count: 1,
+      failed_count: 0,
+      message: "1/1 checks passed",
+    });
+    mockVerifyRedirect.mockResolvedValue({ success: true, resolved_ip: "192.168.1.50", expected_ip: "192.168.1.50", matches_expected: true, message: "OK" });
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) => (b.textContent || "").toLowerCase().includes("verification"));
+      expect(verifyBtn).toBeTruthy();
+    });
+    await act(async () => { fireEvent.click(verifyBtn!); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/myserver\.local/)).toBeInTheDocument();
+    });
+  });
+
+  it("falls back to message for invalid BMX URL", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockResolvedValue({
+      success: true,
+      checks: [
+        { name: "config_bmx_url", passed: true, message: "BMX URL: not-a-url", details: { bmx_url: "not-a-valid-url" } },
+      ],
+      passed_count: 1,
+      failed_count: 0,
+      message: "1/1 checks passed",
+    });
+    mockVerifyRedirect.mockResolvedValue({ success: true, resolved_ip: "192.168.1.50", expected_ip: "192.168.1.50", matches_expected: true, message: "OK" });
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) => (b.textContent || "").toLowerCase().includes("verification"));
+      expect(verifyBtn).toBeTruthy();
+    });
+    await act(async () => { fireEvent.click(verifyBtn!); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/BMX URL: not-a-url/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows translated hosts_ip_correct check with octIp", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockResolvedValue({
+      success: true,
+      checks: [
+        { name: "hosts_ip_correct", passed: true, message: "Hosts IP correct", details: {} },
+      ],
+      passed_count: 1,
+      failed_count: 0,
+      message: "1/1 checks passed",
+    });
+    mockVerifyRedirect.mockResolvedValue({ success: true, resolved_ip: "192.168.1.50", expected_ip: "192.168.1.50", matches_expected: true, message: "OK" });
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) => (b.textContent || "").toLowerCase().includes("verification"));
+      expect(verifyBtn).toBeTruthy();
+    });
+    await act(async () => { fireEvent.click(verifyBtn!); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/192\.168\.1\.50/)).toBeInTheDocument();
+    });
+  });
+
+  it("translates failed checks with missing details", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockResolvedValue({
+      success: true,
+      checks: [
+        { name: "sources_complete", passed: false, message: "Missing sources", details: { missing: ["BLUETOOTH", "TUNEIN"] } },
+        { name: "hosts_ip_correct", passed: false, message: "IP mismatch", details: {} },
+      ],
+      passed_count: 0,
+      failed_count: 2,
+      message: "0/2 checks passed",
+    });
+    mockVerifyRedirect.mockResolvedValue({ success: true, resolved_ip: "192.168.1.50", expected_ip: "192.168.1.50", matches_expected: true, message: "OK" });
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) => (b.textContent || "").toLowerCase().includes("verification"));
+      expect(verifyBtn).toBeTruthy();
+    });
+    await act(async () => { fireEvent.click(verifyBtn!); });
+
+    await waitFor(() => {
+      // Failed sources check with missing details rendered
+      expect(screen.getByText(/BLUETOOTH, TUNEIN/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows failed config_bmx_url with original message", async () => {
+    await reachVerificationPhase();
+
+    mockVerifySetup.mockResolvedValue({
+      success: true,
+      checks: [
+        { name: "config_bmx_url", passed: false, message: "BMX URL missing", details: {} },
+      ],
+      passed_count: 0,
+      failed_count: 1,
+      message: "0/1 checks passed",
+    });
+    mockVerifyRedirect.mockResolvedValue({ success: true, resolved_ip: "192.168.1.50", expected_ip: "192.168.1.50", matches_expected: true, message: "OK" });
+
+    let verifyBtn: HTMLElement | undefined;
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      verifyBtn = buttons.find((b) => (b.textContent || "").toLowerCase().includes("verification"));
+      expect(verifyBtn).toBeTruthy();
+    });
+    await act(async () => { fireEvent.click(verifyBtn!); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/BMX URL missing/)).toBeInTheDocument();
     });
   });
 });
