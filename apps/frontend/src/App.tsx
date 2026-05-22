@@ -29,14 +29,13 @@ interface AppRouterProps {
 
 function AppRouter({ devices: initialDevices, isLoading, error, onRetry }: AppRouterProps) {
   const { t } = useTranslation();
-  const [devices, setDevices] = useState<Device[]>(initialDevices);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    setDevices(initialDevices);
-  }, [initialDevices]);
+  // Derive visible devices: parent data minus locally removed ones
+  const devices = initialDevices.filter((d) => !removedIds.has(d.device_id));
 
   const handleRemoveDevice = (deviceId: string) => {
-    setDevices((prev) => prev.filter((d) => d.device_id !== deviceId));
+    setRemovedIds((prev) => new Set(prev).add(deviceId));
   };
 
   // REFACT-137: Show hint after 3s loading, retry hint after 8s
