@@ -283,6 +283,13 @@
         "nextDisabled": "Spuntare tutti i passaggi sopra per continuare.",
         "deviceNeeds": "Il dispositivo richiede:",
         "model": "Modello:",
+        "adapterNeeded": "Il tuo dispositivo ha una porta Micro-USB. Ti serve un adattatore OTG:",
+        "adapterUsba": "USB-A → Micro-USB OTG Adapter",
+        "adapterUsbc": "USB-C → Micro-USB OTG Adapter",
+        "adapterSearchUsba": "USB-A to Micro-USB OTG Adapter",
+        "adapterSearchUsbc": "USB-C to Micro-USB OTG Adapter",
+        "adapterUsbaPriceHint": "7 €",
+        "adapterUsbcPriceHint": "10 €",
         "platformLabel": "Sistema operativo:",
         "platformAriaLabel": "Seleziona sistema operativo",
         "platformWindowsTitle": "Windows — Formattare la chiavetta USB",
@@ -496,7 +503,68 @@
         "failedStep1": "Riavviare il dispositivo (scollegare e ricollegare l'alimentazione)",
         "failedStep2": "Attendere 60 secondi dopo il riavvio",
         "failedStep3": "Eseguire nuovamente i test",
-        "btnRetryTests": "Esegui nuovamente i test"
+        "btnRetryTests": "Esegui nuovamente i test",
+        "rebootMandatoryHint": "È necessario un riavvio affinché le modifiche alla configurazione abbiano effetto. Il dispositivo deve riavviarsi prima della verifica.",
+        "fullVerifyTitle": "Verifica completa del sistema",
+        "fullVerifyItem1": "UUID dell'account visibile nelle informazioni del dispositivo",
+        "fullVerifyItem2": "Tutte le sorgenti musicali registrate (AUX, TuneIn, Bluetooth, ...)",
+        "fullVerifyItem3": "File di configurazione intatti dopo il riavvio",
+        "fullVerifyItem4": "Reindirizzamenti DNS risolti verso il server OpenCloudTouch",
+        "btnRunFullVerify": "Avvia verifica completa",
+        "fullVerifying": "Verifica completa del sistema in corso...",
+        "systemChecksTitle": "Controlli del sistema",
+        "check": {
+          "uuid_present": {
+            "pass": "UUID del dispositivo: {{uuid}}",
+            "fail": "Il dispositivo non ha un UUID account. La sincronizzazione all'avvio non funzionerà."
+          },
+          "uuid_in_db": {
+            "pass": "UUID registrato per {{db_device_id}}",
+            "fail": "UUID non registrato nel database OCT. L'endpoint di streaming non può risolvere questo dispositivo."
+          },
+          "sources_complete": {
+            "pass": "Tutte le sorgenti richieste presenti",
+            "fail": "Sorgenti mancanti: {{missing}}. La riproduzione dei preset potrebbe fallire per questi tipi di sorgenti."
+          },
+          "config_files_present": {
+            "pass": "Tutti i file di configurazione presenti",
+            "fail": "File di configurazione mancante: {{missing}}. Il firmware potrebbe non trovare il reindirizzamento OCT al riavvio."
+          },
+          "config_files_identical": {
+            "pass": "Tutti i file di configurazione hanno contenuto identico",
+            "fail": "I file di configurazione differiscono. Il dispositivo potrebbe usare l'URL BMX sbagliato dopo il riavvio."
+          },
+          "config_bmx_url": {
+            "pass": "URL BMX: {{bmx_url}}",
+            "fail": "L'URL BMX punta ancora al cloud Bose ({{bmx_url}}). Il dispositivo non contatterà OCT."
+          },
+          "hosts_oct_block": {
+            "pass": "Blocco OCT presente in /etc/hosts",
+            "fail": "Nessun blocco OCT in /etc/hosts. I reindirizzamenti del dominio sono mancanti."
+          },
+          "hosts_domains_complete": {
+            "pass": "Tutti i domini richiesti presenti",
+            "fail": "Voci host mancanti: {{missing}}. Alcuni servizi Bose non saranno reindirizzati."
+          },
+          "hosts_ip_correct": {
+            "pass": "Tutte le voci host puntano all'IP corretto",
+            "fail": "Le voci host puntano all'IP sbagliato. Verificare le voci obsolete."
+          },
+          "system_config_present": {
+            "pass": "SystemConfigurationDB.xml presente",
+            "fail": "SystemConfigurationDB.xml mancante. Il dispositivo potrebbe non inizializzarsi correttamente."
+          },
+          "system_config_uuid_match": {
+            "pass": "L'UUID in SystemConfigurationDB.xml corrisponde al dispositivo",
+            "fail": "L'UUID in SystemConfigurationDB.xml non corrisponde all'UUID del dispositivo"
+          },
+          "connection": {
+            "pass": "Connessione OK",
+            "fail": "Connessione fallita"
+          }
+        },
+        "dnsTestsTitle": "Verifiche di reindirizzamento DNS",
+        "btnRetryFullVerify": "Ripeti verifica"
       },
       "step8": {
         "title": "Configurazione completata!",
@@ -521,8 +589,7 @@
         "nextStep2Desc": "Il dispositivo può ora accedere alla radio Internet e ai preset tramite OpenCloudTouch.",
         "nextStep3Title": "Configurare altri dispositivi",
         "nextStep3Desc": "Ripetere la procedura guidata per altri dispositivi SoundTouch.",
-        "btnHome": "Vai alla home page",
-        "btnAnother": "Configura un altro dispositivo",
+        "btnDone": "Fatto",
         "supportText": "Problemi o domande?",
         "supportLink": "Contatta il supporto →"
       }

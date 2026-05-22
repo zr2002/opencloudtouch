@@ -48,6 +48,11 @@ def _generate_account_uuid() -> str:
     return str(random.randint(1_000_000, 9_999_999))  # noqa: S311
 
 
+def is_valid_account_uuid(uuid: str) -> bool:
+    """Check if UUID matches Bose 7-digit format (digits only, ≥7 chars)."""
+    return bool(uuid) and uuid.isdigit() and len(uuid) >= 7
+
+
 async def check_marge_account_uuid(
     device_ip: str, device_port: int = _DEFAULT_DEVICE_HTTP_PORT
 ) -> Optional[str]:
@@ -79,7 +84,16 @@ async def check_marge_account_uuid(
     if elem is None or not elem.text or not elem.text.strip():
         return None
 
-    return elem.text.strip()
+    uuid = elem.text.strip()
+    if not is_valid_account_uuid(uuid):
+        logger.warning(
+            "Device %s has invalid margeAccountUUID=%s (not 7+ digits), treating as missing",
+            device_ip,
+            uuid,
+        )
+        return None
+
+    return uuid
 
 
 def _update_uuid_in_xml(xml_content: str, uuid: str) -> str:
@@ -96,7 +110,7 @@ def _update_uuid_in_xml(xml_content: str, uuid: str) -> str:
     acct_elem = root.find("acctMode")
     if acct_elem is None:
         acct_elem = SubElement(root, "acctMode")
-    acct_elem.text = "global"
+    acct_elem.text = "local"
 
     multi_elem = root.find("isMultiDeviceAccount")
     if multi_elem is None:
@@ -116,7 +130,7 @@ async def set_account_uuid_via_ssh(
     """Set margeAccountUUID on device via SSH by writing SystemConfigurationDB.xml.
 
     Reads existing file (if present) and updates UUID in-place,
-    or creates from template if missing. Also sets acctMode=global
+    or creates from template if missing. Also sets acctMode=local
     and isMultiDeviceAccount=true. Verifies write by reading back.
 
     /mnt/nv is always writable — no remount needed.

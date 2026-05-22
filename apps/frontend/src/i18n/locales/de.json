@@ -283,6 +283,13 @@
         "nextDisabled": "Bitte alle Schritte oben abhaken, um fortzufahren.",
         "deviceNeeds": "Ihr Gerät benötigt:",
         "model": "Modell:",
+        "adapterNeeded": "Dein Gerät hat einen Micro-USB Port. Du brauchst einen OTG-Adapter:",
+        "adapterUsba": "USB-A → Micro-USB OTG Adapter",
+        "adapterUsbc": "USB-C → Micro-USB OTG Adapter",
+        "adapterSearchUsba": "USB-A auf Micro-USB OTG Adapter",
+        "adapterSearchUsbc": "USB-C auf Micro-USB OTG Adapter",
+        "adapterUsbaPriceHint": "6 €",
+        "adapterUsbcPriceHint": "10 €",
         "platformLabel": "Betriebssystem:",
         "platformAriaLabel": "Betriebssystem auswählen",
         "platformWindowsTitle": "Windows — USB-Stick formatieren",
@@ -459,11 +466,12 @@
         "hostsApplied": "Hosts-Datei erfolgreich geändert."
       },
       "step7": {
-        "title": "Konfiguration testen",
-        "description": "Überprüfen Sie, ob die Domain-Redirects korrekt funktionieren.",
-        "warning": "Falls Tests fehlschlagen, ist möglicherweise ein Geräte-Neustart erforderlich.",
+        "title": "Überprüfung & Test",
+        "description": "Geräte-Konfiguration abschließen, neu starten und alles überprüfen.",
+        "warning": "Alle Checks müssen bestanden werden, bevor Sie fortfahren können.",
         "rebootHeader": "Geräte-Neustart",
         "rebootHint": "Die /etc/hosts-Änderungen werden erst nach einem Neustart wirksam. Starten Sie das Gerät neu, bevor Sie die Tests ausführen.",
+        "rebootMandatoryHint": "Ein Neustart ist erforderlich, damit die Konfigurationsänderungen wirksam werden. Das Gerät muss vor der Überprüfung neu gestartet werden.",
         "btnReboot": "Gerät jetzt neu starten",
         "rebootActionHint": "Nur wenn Tests fehlschlagen und Sie sicher sind, dass der Neustart nötig ist",
         "rebootRebooting": "Neustart-Befehl wird gesendet...",
@@ -475,6 +483,66 @@
         "verifying": "Setup wird überprüft...",
         "btnRetryFinalize": "Erneut versuchen",
         "verifyTitle": "Setup-Überprüfung",
+        "fullVerifyTitle": "Vollständige Systemprüfung",
+        "fullVerifyItem1": "Account-UUID in den Geräteinformationen sichtbar",
+        "fullVerifyItem2": "Alle Musikquellen registriert (AUX, TuneIn, Bluetooth, ...)",
+        "fullVerifyItem3": "Konfigurationsdateien nach Neustart intakt",
+        "fullVerifyItem4": "DNS-Umleitungen zum OpenCloudTouch-Server aufgelöst",
+        "btnRunFullVerify": "Vollständige Überprüfung starten",
+        "fullVerifying": "Vollständige Systemprüfung läuft...",
+        "systemChecksTitle": "Systemprüfungen",
+        "check": {
+          "uuid_present": {
+            "pass": "Geräte-UUID: {{uuid}}",
+            "fail": "Gerät hat keine Account-UUID. Boot-Synchronisierung funktioniert nicht."
+          },
+          "uuid_in_db": {
+            "pass": "UUID registriert für {{db_device_id}}",
+            "fail": "UUID nicht in OCT-Datenbank registriert. Streaming-Endpunkt kann dieses Gerät nicht auflösen."
+          },
+          "sources_complete": {
+            "pass": "Alle benötigten Quellen vorhanden",
+            "fail": "Fehlende Quellen: {{missing}}. Preset-Wiedergabe kann für diese Quelltypen fehlschlagen."
+          },
+          "config_files_present": {
+            "pass": "Alle Konfigurationsdateien vorhanden",
+            "fail": "Fehlende Konfigurationsdatei: {{missing}}. Firmware findet OCT-Umleitung nach Neustart möglicherweise nicht."
+          },
+          "config_files_identical": {
+            "pass": "Alle Konfigurationsdateien haben identischen Inhalt",
+            "fail": "Konfigurationsdateien unterscheiden sich. Gerät könnte nach Neustart falsche BMX-URL verwenden."
+          },
+          "config_bmx_url": {
+            "pass": "BMX-URL: {{bmx_url}}",
+            "fail": "BMX-URL verweist noch auf Bose Cloud ({{bmx_url}}). Gerät wird OCT nicht kontaktieren."
+          },
+          "hosts_oct_block": {
+            "pass": "OCT-Block in /etc/hosts vorhanden",
+            "fail": "Kein OCT-Block in /etc/hosts. Domain-Umleitungen fehlen."
+          },
+          "hosts_domains_complete": {
+            "pass": "Alle benötigten Domains vorhanden",
+            "fail": "Fehlende Host-Einträge: {{missing}}. Einige Bose-Dienste werden nicht umgeleitet."
+          },
+          "hosts_ip_correct": {
+            "pass": "Alle Host-Einträge verweisen auf korrekte IP",
+            "fail": "Host-Einträge verweisen auf falsche IP. Prüfen Sie veraltete Einträge."
+          },
+          "system_config_present": {
+            "pass": "SystemConfigurationDB.xml vorhanden",
+            "fail": "SystemConfigurationDB.xml fehlt. Gerät wird möglicherweise nicht korrekt initialisiert."
+          },
+          "system_config_uuid_match": {
+            "pass": "UUID in SystemConfigurationDB.xml stimmt mit Gerät überein",
+            "fail": "UUID in SystemConfigurationDB.xml stimmt nicht mit Geräte-UUID überein"
+          },
+          "connection": {
+            "pass": "Verbindung OK",
+            "fail": "Verbindung fehlgeschlagen"
+          }
+        },
+        "dnsTestsTitle": "DNS-Umleitungsprüfungen",
+        "btnRetryFullVerify": "Überprüfung erneut ausführen",
         "testInfoTitle": "Was wird getestet?",
         "testInfoItem1": "DNS-Auflösung der Bose-Domains",
         "testInfoItem2": "Umleitung zu Ihrem OpenCloudTouch Server",
@@ -489,10 +557,10 @@
         "statusFailed": "✗ Fehlerhaft",
         "domainInternetRadio": "Internet-Radio",
         "domainStreaming": "Streaming-Services",
-        "allPassedTitle": "Alle Tests bestanden!",
-        "allPassedMessage": "Die Domain-Redirects funktionieren korrekt. Ihr Gerät ist bereit für den Einsatz.",
-        "someFailedTitle": "Einige Tests sind fehlgeschlagen",
-        "someFailedMessage": "Die DNS-Änderungen sind möglicherweise noch nicht aktiv. Versuchen Sie folgende Schritte:",
+        "allPassedTitle": "Alle Checks bestanden!",
+        "allPassedMessage": "Ihr Gerät ist vollständig konfiguriert und einsatzbereit. Alle System-Checks und DNS-Umleitungen funktionieren korrekt.",
+        "someFailedTitle": "Einige Checks sind fehlgeschlagen",
+        "someFailedMessage": "Nicht alle Überprüfungen waren erfolgreich. Prüfen Sie die Ergebnisse oben und versuchen Sie es erneut.",
         "failedStep1": "Starten Sie das Gerät neu (Stromversorgung trennen und wieder verbinden)",
         "failedStep2": "Warten Sie 60 Sekunden nach dem Neustart",
         "failedStep3": "Führen Sie die Tests erneut aus",
@@ -521,8 +589,7 @@
         "nextStep2Desc": "Ihr Gerät kann nun über OpenCloudTouch auf Internet-Radio und Presets zugreifen.",
         "nextStep3Title": "Weitere Geräte konfigurieren",
         "nextStep3Desc": "Wiederholen Sie den Wizard für weitere SoundTouch-Geräte.",
-        "btnHome": "Zur Startseite",
-        "btnAnother": "Weiteres Gerät konfigurieren",
+        "btnDone": "Fertig",
         "supportText": "Probleme oder Fragen?",
         "supportLink": "Support kontaktieren →"
       }
