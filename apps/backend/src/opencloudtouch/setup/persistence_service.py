@@ -74,7 +74,9 @@ def build_sources_xml() -> str:
         lines.append(
             f'    <source displayName="{src.display_name}" secret="" secretType="{src.secret_type}">'
         )
-        lines.append(f'        <sourceKey type="{src.source_type}" account="{src.account}" />')
+        lines.append(
+            f'        <sourceKey type="{src.source_type}" account="{src.account}" />'
+        )
         lines.append("    </source>")
     lines.append("</sources>")
     return "\n".join(lines) + "\n"

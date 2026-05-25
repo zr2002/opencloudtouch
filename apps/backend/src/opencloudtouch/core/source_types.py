@@ -34,11 +34,20 @@ class SourceType:
 BASE_SOURCES: list[SourceType] = [
     SourceType("42", "AIRPLAY", "AIRPLAY", "", "", _TS_2018),
     SourceType("41", "AUX", "AUX IN", "AUX", "", _TS_2013),
-    SourceType("11", "LOCAL_INTERNET_RADIO", "LOCAL_INTERNET_RADIO", "", "token", _TS_2014),
+    SourceType(
+        "11", "LOCAL_INTERNET_RADIO", "LOCAL_INTERNET_RADIO", "", "token", _TS_2014
+    ),
     SourceType("53", "QPLAY", "QPLAY", "", "", _TS_2014),
     SourceType("30", "SPOTIFY", "SPOTIFY", "", "", "2014-06-01T00:00:00.000+00:00"),
     SourceType("50", "STORED_MUSIC", "STORED_MUSIC", "", "", _TS_2014),
-    SourceType("51", "STORED_MUSIC_MEDIA_RENDERER", "STORED_MUSIC_MEDIA_RENDERER", "", "", _TS_2014),
+    SourceType(
+        "51",
+        "STORED_MUSIC_MEDIA_RENDERER",
+        "STORED_MUSIC_MEDIA_RENDERER",
+        "",
+        "",
+        _TS_2014,
+    ),
     SourceType("25", "TUNEIN", "TUNEIN", "", "token", _TS_2012),
     SourceType("52", "UPNP", "UPNP", "", "", _TS_2014),
 ]
