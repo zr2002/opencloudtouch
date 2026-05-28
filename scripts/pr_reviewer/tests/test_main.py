@@ -23,7 +23,9 @@ from main import (
     _should_skip,
     build_review_prompt,
     check_and_approve,
+    get_ci_status,
     has_bot_reviewed_commit,
+    wait_for_ci,
 )
 
 
@@ -378,3 +380,349 @@ class TestHasBotReviewedCommit:
 
         result = await has_bot_reviewed_commit(client, "owner/repo", 1, "abc123")
         assert result is False
+
+
+# =============================================================================
+# CI Status Check Tests
+# =============================================================================
+
+
+class TestGetCiStatus:
+    @pytest.mark.asyncio
+    async def test_all_checks_passing(self):
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {
+            "check_runs": [
+                {"name": "CI/Backend Tests", "status": "completed", "conclusion": "success"},
+                {"name": "CI/Frontend Tests", "status": "completed", "conclusion": "success"},
+                {"name": "CI/Lint Code", "status": "completed", "conclusion": "success"},
+            ],
+        }
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await get_ci_status(client, "owner/repo", "abc123")
+        assert passed is True
+        assert failures == []
+
+    @pytest.mark.asyncio
+    async def test_failing_check_run(self):
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {
+            "check_runs": [
+                {"name": "CI/Backend Tests", "status": "completed", "conclusion": "failure"},
+                {"name": "CI/Frontend Tests", "status": "completed", "conclusion": "success"},
+            ],
+        }
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await get_ci_status(client, "owner/repo", "abc123")
+        assert passed is False
+        assert "CI/Backend Tests (failure)" in failures
+
+    @pytest.mark.asyncio
+    async def test_pending_check_run(self):
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {
+            "check_runs": [
+                {"name": "CI/Backend Tests", "status": "in_progress", "conclusion": None},
+            ],
+        }
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await get_ci_status(client, "owner/repo", "abc123")
+        assert passed is False
+        assert "CI/Backend Tests (still in_progress)" in failures
+
+    @pytest.mark.asyncio
+    async def test_skipped_and_neutral_pass(self):
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {
+            "check_runs": [
+                {"name": "CI/SonarCloud", "status": "completed", "conclusion": "skipped"},
+                {"name": "CI/Optional", "status": "completed", "conclusion": "neutral"},
+            ],
+        }
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await get_ci_status(client, "owner/repo", "abc123")
+        assert passed is True
+        assert failures == []
+
+    @pytest.mark.asyncio
+    async def test_pr_review_checks_skipped(self):
+        """PR Review checks should be excluded to avoid circular dependency."""
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {
+            "check_runs": [
+                {"name": "PR Review (oct-support)/AI Review", "status": "completed", "conclusion": "success"},
+                {"name": "PR Review (oct-support)/Approve Check", "status": "queued", "conclusion": None},
+                {"name": "CI/Backend Tests", "status": "completed", "conclusion": "success"},
+            ],
+        }
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await get_ci_status(client, "owner/repo", "abc123")
+        assert passed is True
+        assert failures == []
+
+    @pytest.mark.asyncio
+    async def test_legacy_commit_status_failure(self):
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {"check_runs": []}
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {
+            "statuses": [
+                {"context": "external-ci/build", "state": "failure"},
+            ],
+        }
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await get_ci_status(client, "owner/repo", "abc123")
+        assert passed is False
+        assert "external-ci/build (failure)" in failures
+
+
+# =============================================================================
+# check_and_approve with CI Check Tests
+# =============================================================================
+
+
+class TestCheckAndApproveCiGate:
+    @pytest.mark.asyncio
+    async def test_approve_blocked_when_ci_failing(self):
+        """When threads resolved but CI failing, should NOT approve."""
+        client = AsyncMock()
+
+        # GraphQL: all threads resolved
+        graphql_resp = MagicMock()
+        graphql_resp.status_code = 200
+        graphql_resp.json.return_value = {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "reviewThreads": {
+                            "nodes": [
+                                {
+                                    "id": "t1",
+                                    "isResolved": True,
+                                    "comments": {
+                                        "nodes": [
+                                            {"author": {"login": BOT_USERNAME}, "body": "Fix this"},
+                                        ],
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+        }
+        graphql_resp.raise_for_status = MagicMock()
+
+        # Reviews: no existing approval
+        reviews_resp = MagicMock()
+        reviews_resp.status_code = 200
+        reviews_resp.json.return_value = [
+            {"user": {"login": BOT_USERNAME}, "state": "COMMENTED"},
+        ]
+        reviews_resp.raise_for_status = MagicMock()
+
+        # PR details
+        pr_resp = MagicMock()
+        pr_resp.status_code = 200
+        pr_resp.json.return_value = {"head": {"sha": "abc123"}}
+        pr_resp.raise_for_status = MagicMock()
+
+        # CI: check runs failing
+        ci_resp = MagicMock()
+        ci_resp.status_code = 200
+        ci_resp.json.return_value = {
+            "check_runs": [
+                {"name": "CI/Backend Tests", "status": "completed", "conclusion": "failure"},
+            ],
+        }
+        ci_resp.raise_for_status = MagicMock()
+
+        # Commit status: empty
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        # Comment post response
+        comment_resp = MagicMock()
+        comment_resp.status_code = 200
+        comment_resp.raise_for_status = MagicMock()
+
+        # post calls: GraphQL, then CI-blocked comment
+        client.post = AsyncMock(side_effect=[graphql_resp, comment_resp])
+        # get calls: reviews, PR details, check-runs, commit status
+        client.get = AsyncMock(side_effect=[reviews_resp, pr_resp, ci_resp, status_resp])
+
+        await check_and_approve(client, "owner/repo", 1)
+
+        # Should post a COMMENT (CI-blocked), NOT an APPROVE
+        last_post = client.post.call_args_list[-1]
+        posted_payload = last_post.kwargs.get("json") or last_post[1].get("json")
+        assert posted_payload["event"] == "COMMENT"
+        assert "CI checks not passing" in posted_payload["body"]
+
+
+# =============================================================================
+# wait_for_ci Tests
+# =============================================================================
+
+
+class TestWaitForCi:
+    @pytest.mark.asyncio
+    async def test_returns_immediately_when_all_complete(self):
+        """When all checks are already complete, should not poll."""
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {
+            "check_runs": [
+                {"name": "CI/Tests", "status": "completed", "conclusion": "success"},
+            ],
+        }
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await wait_for_ci(client, "owner/repo", "abc123")
+        assert passed is True
+        assert failures == []
+        # Only 2 GET calls (check-runs + status), no polling
+        assert client.get.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_polls_until_complete(self, monkeypatch):
+        """When checks are in_progress, should poll until complete."""
+        import main as main_mod
+
+        # Speed up polling for test
+        monkeypatch.setattr(main_mod, "CI_POLL_INTERVAL_SECONDS", 0)
+        monkeypatch.setattr(main_mod, "CI_POLL_MAX_WAIT_SECONDS", 10)
+
+        client = AsyncMock()
+
+        # First poll: in_progress
+        resp1_cr = MagicMock()
+        resp1_cr.status_code = 200
+        resp1_cr.json.return_value = {
+            "check_runs": [
+                {"name": "CI/Tests", "status": "in_progress", "conclusion": None},
+            ],
+        }
+        resp1_cr.raise_for_status = MagicMock()
+
+        resp1_st = MagicMock()
+        resp1_st.status_code = 200
+        resp1_st.json.return_value = {"statuses": []}
+        resp1_st.raise_for_status = MagicMock()
+
+        # Second poll: complete
+        resp2_cr = MagicMock()
+        resp2_cr.status_code = 200
+        resp2_cr.json.return_value = {
+            "check_runs": [
+                {"name": "CI/Tests", "status": "completed", "conclusion": "success"},
+            ],
+        }
+        resp2_cr.raise_for_status = MagicMock()
+
+        resp2_st = MagicMock()
+        resp2_st.status_code = 200
+        resp2_st.json.return_value = {"statuses": []}
+        resp2_st.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[resp1_cr, resp1_st, resp2_cr, resp2_st])
+
+        passed, failures = await wait_for_ci(client, "owner/repo", "abc123")
+        assert passed is True
+        assert client.get.call_count == 4  # 2 calls per poll × 2 polls
+
+    @pytest.mark.asyncio
+    async def test_returns_failures_after_ci_complete(self, monkeypatch):
+        """When CI completes with failures, returns them."""
+        import main as main_mod
+        monkeypatch.setattr(main_mod, "CI_POLL_INTERVAL_SECONDS", 0)
+
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {
+            "check_runs": [
+                {"name": "CI/Backend", "status": "completed", "conclusion": "failure"},
+                {"name": "CI/Frontend", "status": "completed", "conclusion": "success"},
+            ],
+        }
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await wait_for_ci(client, "owner/repo", "abc123")
+        assert passed is False
+        assert "CI/Backend (failure)" in failures

@@ -33,7 +33,7 @@ jobs:
   review:
     name: AI Review
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     if: >-
       github.event_name == 'pull_request_target'
       && github.event.requested_reviewer.login == 'oct-support'
@@ -85,7 +85,7 @@ jobs:
   approve-check:
     name: Approve Check
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 25
     if: >-
       github.event_name == 'pull_request_target'
       && github.event.action == 'synchronize'
@@ -118,7 +118,7 @@ jobs:
   comment-trigger:
     name: Comment Trigger
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     if: >-
       github.event_name == 'issue_comment'
       && github.event.issue.pull_request

@@ -60,6 +60,10 @@ MONTHLY_BUDGET_USD = 0.90
 # Rate limiting — cooldown per PR (seconds)
 REVIEW_COOLDOWN_SECONDS = 300  # 5 min between reviews on same PR
 
+# CI polling — wait for CI to complete before reviewing
+CI_POLL_INTERVAL_SECONDS = 30
+CI_POLL_MAX_WAIT_SECONDS = 1200  # 20 min max wait (CI avg ~10 min, max ~11 min + growth buffer)
+
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "oct-support")
 
 
@@ -320,6 +324,83 @@ async def get_review_threads(client: httpx.AsyncClient, repo: str, pr_number: in
     return threads_data
 
 
+async def wait_for_ci(client: httpx.AsyncClient, repo: str, commit_sha: str) -> tuple[bool, list[str]]:
+    """Wait for CI checks to complete, then return final status.
+
+    Polls every CI_POLL_INTERVAL_SECONDS until all checks are done or timeout.
+    Returns (all_passed, failure_details).
+    """
+    import time
+    start = time.monotonic()
+    while True:
+        elapsed = time.monotonic() - start
+        all_passed, failures = await get_ci_status(client, repo, commit_sha)
+
+        # Check if any are still pending/in_progress
+        still_running = [f for f in failures if "still " in f]
+        if not still_running:
+            # All checks completed (or no checks at all)
+            return all_passed, failures
+
+        if elapsed >= CI_POLL_MAX_WAIT_SECONDS:
+            print(f"[WARN] CI polling timeout after {elapsed:.0f}s. Proceeding with current status.")
+            return all_passed, failures
+
+        print(f"[INFO] CI still running ({len(still_running)} pending), waiting {CI_POLL_INTERVAL_SECONDS}s... ({elapsed:.0f}s/{CI_POLL_MAX_WAIT_SECONDS}s)")
+        await asyncio.sleep(CI_POLL_INTERVAL_SECONDS)
+
+
+async def get_ci_status(client: httpx.AsyncClient, repo: str, commit_sha: str) -> tuple[bool, list[str]]:
+    """Check if all CI checks pass for a commit.
+
+    Returns (all_passed, failure_details) where failure_details lists failing check names.
+    Checks both Check Runs (GitHub Actions) and Commit Status (legacy status API).
+    """
+    failures: list[str] = []
+
+    # 1. Check Runs (GitHub Actions, CodeQL, etc.)
+    resp = await _request_with_retry(
+        client, "get",
+        f"{API_BASE}/repos/{repo}/commits/{commit_sha}/check-runs",
+        headers=HEADERS,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
+    check_runs = resp.json().get("check_runs", [])
+
+    for cr in check_runs:
+        name = cr.get("name", "unknown")
+        status = cr.get("status")  # queued, in_progress, completed
+        conclusion = cr.get("conclusion")  # success, failure, neutral, cancelled, skipped, timed_out, action_required
+
+        # Skip our own PR Review checks to avoid circular dependency
+        if "PR Review" in name or "pr-review" in name.lower():
+            continue
+
+        if status != "completed":
+            failures.append(f"{name} (still {status})")
+        elif conclusion not in ("success", "neutral", "skipped"):
+            failures.append(f"{name} ({conclusion})")
+
+    # 2. Commit Status (legacy — some integrations use this)
+    resp = await _request_with_retry(
+        client, "get",
+        f"{API_BASE}/repos/{repo}/commits/{commit_sha}/status",
+        headers=HEADERS,
+    )
+    resp.raise_for_status()
+    status_data = resp.json()
+
+    for s in status_data.get("statuses", []):
+        context = s.get("context", "unknown")
+        state = s.get("state")  # pending, success, error, failure
+        if state not in ("success", "pending"):
+            failures.append(f"{context} ({state})")
+
+    all_passed = len(failures) == 0
+    return all_passed, failures
+
+
 async def get_existing_reviews(client: httpx.AsyncClient, repo: str, pr_number: int) -> list[dict]:
     """Get all reviews on a PR."""
     resp = await _request_with_retry(
@@ -495,6 +576,14 @@ async def submit_review(
     verdict = review_result.get("verdict", "comment")
     event = event_map.get(verdict, "COMMENT")
 
+    # Never approve without green CI — downgrade to COMMENT
+    if event == "APPROVE":
+        ci_passed, ci_failures = await get_ci_status(client, repo, commit_sha)
+        if not ci_passed:
+            failure_list = ", ".join(ci_failures[:5])
+            print(f"[INFO] AI verdict was APPROVE but CI is not green ({failure_list}). Downgrading to COMMENT.")
+            event = "COMMENT"
+
     # Don't auto-approve on first review — always provide feedback first
     if event == "APPROVE" and not review_result.get("comments"):
         event = "APPROVE"
@@ -610,9 +699,35 @@ async def check_and_approve(client: httpx.AsyncClient, repo: str, pr_number: int
     pr_details = await get_pr_details(client, repo, pr_number)
     commit_sha = pr_details["head"]["sha"]
 
+    # Wait for CI to finish before approving
+    print(f"[INFO] Waiting for CI checks on {commit_sha[:8]}...")
+    ci_passed, ci_failures = await wait_for_ci(client, repo, commit_sha)
+    if not ci_passed:
+        failure_list = "\n".join(f"- {f}" for f in ci_failures)
+        print(f"[INFO] CI checks not passing — cannot auto-approve:\n{failure_list}")
+        # Post a comment explaining why approval is blocked
+        payload = {
+            "body": (
+                "⏳ **Auto-approval blocked — CI checks not passing**\n\n"
+                "All review threads are resolved, but the following checks are failing or pending:\n\n"
+                f"{failure_list}\n\n"
+                "Auto-approval will proceed once all CI checks pass."
+            ),
+            "event": "COMMENT",
+            "commit_id": commit_sha,
+        }
+        resp = await client.post(
+            f"{API_BASE}/repos/{repo}/pulls/{pr_number}/reviews",
+            headers=HEADERS,
+            json=payload,
+        )
+        resp.raise_for_status()
+        print(f"[OK] Posted CI-blocked comment on PR #{pr_number}.")
+        return
+
     # Submit approval
     payload = {
-        "body": "✅ **All review threads resolved — auto-approved.**\n\nAll issues from the previous review have been addressed.",
+        "body": "✅ **All review threads resolved & CI passing — auto-approved.**\n\nAll issues from the previous review have been addressed and all CI checks are green.",
         "event": "APPROVE",
         "commit_id": commit_sha,
     }
@@ -622,7 +737,7 @@ async def check_and_approve(client: httpx.AsyncClient, repo: str, pr_number: int
         json=payload,
     )
     resp.raise_for_status()
-    print(f"[OK] PR #{pr_number} approved by oct-support — all {len(bot_threads)} threads resolved.")
+    print(f"[OK] PR #{pr_number} approved by oct-support — all {len(bot_threads)} threads resolved, CI green.")
 
 
 async def run() -> int:
@@ -673,7 +788,23 @@ async def run() -> int:
                 print("[INFO] No reviewable files changed. Skipping review.")
                 return 0
 
+            # Wait for CI to finish — CI results inform the review
+            print(f"[INFO] Waiting for CI checks on {commit_sha[:8]}...")
+            ci_passed, ci_failures = await wait_for_ci(client, repo, commit_sha)
+
             prompt = build_review_prompt(pr_details, files)
+
+            # Include CI failures in prompt so AI considers them
+            if not ci_passed:
+                ci_context = "\n".join(f"- {f}" for f in ci_failures if "still " not in f)
+                if ci_context:
+                    prompt += (
+                        "\n\n## CI Status — FAILING\n"
+                        "The following CI checks are failing on this PR. "
+                        "Factor this into your review — the code likely has bugs or test failures:\n"
+                        f"{ci_context}\n"
+                    )
+
             review_result = await run_ai_review(prompt, cost_tracker)
             valid_lines_map = _build_valid_lines_map(files)
             await submit_review(client, repo, pr_number, commit_sha, review_result, valid_lines_map)
