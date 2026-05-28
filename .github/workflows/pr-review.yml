@@ -42,7 +42,7 @@ jobs:
       - name: "Checkout base branch (security: never run PR code)"
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -94,7 +94,7 @@ jobs:
       - name: "Checkout base branch (security: never run PR code)"
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
