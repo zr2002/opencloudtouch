@@ -52,10 +52,10 @@ MAX_FILE_DIFF_CHARS = 8000
 # Max total diff size sent to AI
 MAX_TOTAL_DIFF_CHARS = 60000
 
-# Cost tracking — GPT-4o-mini pricing
-INPUT_COST_PER_TOKEN = 0.15 / 1_000_000
-OUTPUT_COST_PER_TOKEN = 0.60 / 1_000_000
-MONTHLY_BUDGET_USD = 0.90
+# Cost tracking — GPT-4o pricing (fallback only, primary is free GitHub Models)
+INPUT_COST_PER_TOKEN = 2.50 / 1_000_000
+OUTPUT_COST_PER_TOKEN = 10.00 / 1_000_000
+MONTHLY_BUDGET_USD = 1.00
 
 # Rate limiting — cooldown per PR (seconds)
 REVIEW_COOLDOWN_SECONDS = 300  # 5 min between reviews on same PR
@@ -454,8 +454,15 @@ def build_review_prompt(pr_details: dict, files: list[dict]) -> str:
 
     files_text = "\n".join(file_sections) if file_sections else "(no reviewable file changes)"
 
-    return f"""You are a senior code reviewer for the OpenCloudTouch project (Python backend + React/TypeScript frontend).
-Review this pull request carefully and provide actionable feedback.
+    return f"""You are a senior staff engineer reviewing code for the OpenCloudTouch project.
+
+## Project Context
+OpenCloudTouch is a self-hosted alternative cloud server for Bose SoundTouch speakers.
+- **Backend**: Python 3.11+, FastAPI, async/await, Clean Architecture (routes → service → repository/adapter)
+- **Frontend**: React 19, TypeScript strict mode, TanStack React Query, Vite, functional components only
+- **Testing**: pytest (backend), vitest + Cypress (frontend). Coverage ≥80% enforced.
+- **Patterns**: Repository pattern for data access, adapter pattern for external systems, dependency injection via constructors
+- **Security**: No secrets in code, defusedxml for XML parsing, input validation at API boundaries
 
 ## PR Details
 - **Title:** {title}
@@ -465,37 +472,52 @@ Review this pull request carefully and provide actionable feedback.
 ## Changed Files
 {files_text}
 
-## Review Guidelines
-1. Focus ONLY on: real bugs, security vulnerabilities, logic errors, missing error handling, data loss risks, race conditions
-2. Also flag: type mismatches, resource leaks, unvalidated inputs, hardcoded secrets
-3. For each issue, specify the EXACT file path and line number FROM THE DIFF (lines starting with +)
-4. Be specific — suggest the exact fix, not vague advice
-5. Do NOT comment on: coding style, naming conventions, missing comments, documentation, test naming patterns
-6. Do NOT suggest "consider adding a comment" or "consider renaming" — those are noise
-7. If the code is correct and safe, approve it. Don't invent problems to justify your existence.
+## What to Review (HIGH VALUE — focus here)
+1. **Bugs**: Logic errors, off-by-one, null/undefined access, wrong variable, inverted conditions, missing await
+2. **Security**: SQL injection, path traversal, unvalidated user input, hardcoded secrets, XML injection, SSRF
+3. **Data integrity**: Missing transactions, race conditions, partial writes without rollback, lost updates
+4. **Error handling**: Swallowed exceptions, missing try/catch around I/O, unclear error messages for users
+5. **API contract**: Response shape mismatches, missing fields, wrong HTTP status codes, breaking changes
+6. **Resource leaks**: Unclosed connections/files/streams, missing cleanup in finally/context managers
+7. **Type safety**: Wrong types passed across boundaries, unsafe casts, missing None checks
+
+## What NOT to Review (LOW VALUE — skip entirely)
+- Naming conventions, variable naming style
+- Missing comments or docstrings
+- Import ordering
+- Code formatting (handled by Black/Prettier)
+- Test naming patterns
+- "Consider extracting a helper" suggestions
+- Any suggestion starting with "consider" or "you might want to"
+
+## Review Philosophy
+- If the code works correctly and is safe, **approve it**. Don't manufacture issues.
+- Every comment must identify a **concrete problem** with a **specific fix**.
+- Prefer showing the corrected code over describing what to change.
+- A great review catches the bug the author missed, not the style the author chose.
 
 ## Output Format
 Respond with a JSON object:
 {{
-  "summary": "Brief overall assessment (2-3 sentences)",
+  "summary": "Brief overall assessment (2-3 sentences). What does this PR do? Is it safe to merge?",
   "verdict": "approve" | "request_changes" | "comment",
   "comments": [
     {{
       "path": "relative/file/path",
-      "line": <line number in the NEW version of the file, must be a + line from the diff>,
+      "line": <line number from the diff — must be a + line or context line>,
       "side": "RIGHT",
-      "body": "Your review comment with specific fix suggestion"
+      "body": "**Bug/Security/Issue type**: Clear description of the problem.\\n\\nSuggested fix:\\n```python\\n# corrected code here\\n```"
     }}
   ]
 }}
 
 ## Verdict Rules
-- "approve": No issues found, or only trivial observations. This is the MOST COMMON verdict.
-- "comment": Minor suggestions that don't block merge (nice-to-have improvements).
-- "request_changes": ONLY for actual bugs, security issues, data loss risks, or critical logic errors. Use sparingly.
+- **"approve"**: No real issues found. This should be the most common verdict for well-written code.
+- **"comment"**: Minor non-blocking observations (1-2 items). Things the author should know but that don't block merge.
+- **"request_changes"**: ONLY for actual bugs, security vulnerabilities, data loss risks. Must be clearly justified.
 
-IMPORTANT: Line numbers MUST correspond to lines visible in the diff (lines starting with +, or context lines).
-If no real issues found, use verdict "approve" with empty comments array.
+IMPORTANT: Line numbers MUST correspond to lines visible in the diff (lines starting with + or context lines).
+If no real issues found, use verdict "approve" with an empty comments array.
 """
 
 
@@ -507,14 +529,20 @@ async def run_ai_review(prompt: str, cost_tracker: CostTracker) -> dict:
     openai_api_key = os.environ.get("OPENAI_API_KEY", "")
 
     messages = [
-        {"role": "system", "content": "You are a precise code reviewer. Respond only with valid JSON."},
+        {"role": "system", "content": (
+            "You are a senior staff engineer performing code reviews. "
+            "You think carefully about correctness, security, and edge cases. "
+            "You never comment on style or formatting — only real issues that could cause bugs or security problems. "
+            "When you find no issues, you approve without hesitation. "
+            "Respond only with valid JSON matching the requested schema."
+        )},
         {"role": "user", "content": prompt},
     ]
     kwargs = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-4o",
         "messages": messages,
-        "temperature": 0.1,
-        "max_tokens": 4000,
+        "temperature": 0.0,
+        "max_tokens": 8000,
         "response_format": {"type": "json_object"},
     }
 
