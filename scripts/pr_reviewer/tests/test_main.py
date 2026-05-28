@@ -511,6 +511,33 @@ class TestGetCiStatus:
         assert failures == []
 
     @pytest.mark.asyncio
+    async def test_own_job_names_skipped_without_workflow_prefix(self):
+        """Job names without workflow prefix (AI Review, Approve Check, Comment Trigger) must be skipped."""
+        client = AsyncMock()
+        check_runs_resp = MagicMock()
+        check_runs_resp.status_code = 200
+        check_runs_resp.json.return_value = {
+            "check_runs": [
+{"name": "PR Review", "status": "in_progress", "conclusion": None},
+                {"name": "Approve Check", "status": "completed", "conclusion": "skipped"},
+                {"name": "Comment Trigger", "status": "completed", "conclusion": "skipped"},
+                {"name": "CI/Backend Tests", "status": "completed", "conclusion": "success"},
+            ],
+        }
+        check_runs_resp.raise_for_status = MagicMock()
+
+        status_resp = MagicMock()
+        status_resp.status_code = 200
+        status_resp.json.return_value = {"statuses": []}
+        status_resp.raise_for_status = MagicMock()
+
+        client.get = AsyncMock(side_effect=[check_runs_resp, status_resp])
+
+        passed, failures = await get_ci_status(client, "owner/repo", "abc123")
+        assert passed is True
+        assert failures == []
+
+    @pytest.mark.asyncio
     async def test_legacy_commit_status_failure(self):
         client = AsyncMock()
         check_runs_resp = MagicMock()

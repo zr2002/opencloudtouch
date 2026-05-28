@@ -31,7 +31,7 @@ jobs:
   # PHASE 1: AI REVIEW — when oct-support is requested as reviewer
   # ============================================================================
   review:
-    name: AI Review
+    name: PR Review
     runs-on: ubuntu-latest
     timeout-minutes: 25
     if: >-

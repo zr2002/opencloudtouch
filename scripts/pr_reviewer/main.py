@@ -374,7 +374,9 @@ async def get_ci_status(client: httpx.AsyncClient, repo: str, commit_sha: str) -
         conclusion = cr.get("conclusion")  # success, failure, neutral, cancelled, skipped, timed_out, action_required
 
         # Skip our own PR Review checks to avoid circular dependency
-        if "PR Review" in name or "pr-review" in name.lower():
+        # Job names: "PR Review", "Approve Check", "Comment Trigger"
+        # Workflow may prefix with "PR Review (oct-support) / "
+        if "PR Review" in name or "pr-review" in name.lower() or "Approve Check" in name or "Comment Trigger" in name:
             continue
 
         if status != "completed":
