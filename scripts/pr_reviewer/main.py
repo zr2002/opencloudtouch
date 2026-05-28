@@ -331,6 +331,17 @@ async def get_existing_reviews(client: httpx.AsyncClient, repo: str, pr_number: 
     return resp.json()
 
 
+async def has_bot_reviewed_commit(client: httpx.AsyncClient, repo: str, pr_number: int, commit_sha: str) -> bool:
+    """Check if oct-support already reviewed this specific commit."""
+    reviews = await get_existing_reviews(client, repo, pr_number)
+    for r in reviews:
+        if (r.get("user", {}).get("login") == BOT_USERNAME
+                and r.get("commit_id") == commit_sha
+                and r.get("state") in ("COMMENTED", "CHANGES_REQUESTED", "APPROVED")):
+            return True
+    return False
+
+
 def build_review_prompt(pr_details: dict, files: list[dict]) -> str:
     """Build the AI prompt for reviewing a PR."""
     title = pr_details["title"]
@@ -372,13 +383,13 @@ Review this pull request carefully and provide actionable feedback.
 {files_text}
 
 ## Review Guidelines
-1. Focus on: bugs, security issues, logic errors, missing error handling, test gaps
-2. Consider: naming, readability, Clean Code principles, SOLID
-3. Check: type safety, edge cases, resource cleanup, error messages
-4. Note: imports, unused variables, potential race conditions
-5. Be constructive — suggest specific fixes, not just "this is wrong"
-6. If the code looks good, say so. Don't invent problems.
-7. For each issue found, specify the exact file and line number from the diff
+1. Focus ONLY on: real bugs, security vulnerabilities, logic errors, missing error handling, data loss risks, race conditions
+2. Also flag: type mismatches, resource leaks, unvalidated inputs, hardcoded secrets
+3. For each issue, specify the EXACT file path and line number FROM THE DIFF (lines starting with +)
+4. Be specific — suggest the exact fix, not vague advice
+5. Do NOT comment on: coding style, naming conventions, missing comments, documentation, test naming patterns
+6. Do NOT suggest "consider adding a comment" or "consider renaming" — those are noise
+7. If the code is correct and safe, approve it. Don't invent problems to justify your existence.
 
 ## Output Format
 Respond with a JSON object:
@@ -388,16 +399,20 @@ Respond with a JSON object:
   "comments": [
     {{
       "path": "relative/file/path",
-      "line": <line number in the new version of the file>,
+      "line": <line number in the NEW version of the file, must be a + line from the diff>,
       "side": "RIGHT",
-      "body": "Your review comment with suggestion"
+      "body": "Your review comment with specific fix suggestion"
     }}
   ]
 }}
 
-If no issues found, use verdict "approve" with empty comments array.
-Only use "request_changes" for actual bugs, security issues, or critical problems.
-Use "comment" for style suggestions or minor improvements.
+## Verdict Rules
+- "approve": No issues found, or only trivial observations. This is the MOST COMMON verdict.
+- "comment": Minor suggestions that don't block merge (nice-to-have improvements).
+- "request_changes": ONLY for actual bugs, security issues, data loss risks, or critical logic errors. Use sparingly.
+
+IMPORTANT: Line numbers MUST correspond to lines visible in the diff (lines starting with +, or context lines).
+If no real issues found, use verdict "approve" with empty comments array.
 """
 
 
@@ -645,6 +660,13 @@ async def run() -> int:
             print(f"[INFO] Reviewing PR #{pr_number} in {repo}...")
             pr_details = await get_pr_details(client, repo, pr_number)
             files = await get_pr_files(client, repo, pr_number)
+            commit_sha = pr_details["head"]["sha"]
+
+            # Prevent duplicate reviews on the same commit
+            if await has_bot_reviewed_commit(client, repo, pr_number, commit_sha):
+                print(f"[INFO] Already reviewed commit {commit_sha[:8]} on PR #{pr_number}. Skipping.")
+                rate_limiter.save()
+                return 0
 
             reviewable = [f for f in files if not _should_skip(f["filename"])]
             if not reviewable:
@@ -653,7 +675,6 @@ async def run() -> int:
 
             prompt = build_review_prompt(pr_details, files)
             review_result = await run_ai_review(prompt, cost_tracker)
-            commit_sha = pr_details["head"]["sha"]
             valid_lines_map = _build_valid_lines_map(files)
             await submit_review(client, repo, pr_number, commit_sha, review_result, valid_lines_map)
 

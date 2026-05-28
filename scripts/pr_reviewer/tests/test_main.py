@@ -23,6 +23,7 @@ from main import (
     _should_skip,
     build_review_prompt,
     check_and_approve,
+    has_bot_reviewed_commit,
 )
 
 
@@ -318,3 +319,62 @@ class TestBuildValidLinesMap:
         assert 3 in result["a.py"]
         assert "b.py" not in result
         assert "c.py" not in result
+
+
+# =============================================================================
+# Duplicate Review Detection Tests
+# =============================================================================
+
+
+class TestHasBotReviewedCommit:
+    @pytest.mark.asyncio
+    async def test_returns_true_when_already_reviewed(self):
+        client = AsyncMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [
+            {"user": {"login": "oct-support"}, "commit_id": "abc123", "state": "COMMENTED"},
+        ]
+        mock_resp.raise_for_status = MagicMock()
+        client.get = AsyncMock(return_value=mock_resp)
+
+        result = await has_bot_reviewed_commit(client, "owner/repo", 1, "abc123")
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_for_different_commit(self):
+        client = AsyncMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [
+            {"user": {"login": "oct-support"}, "commit_id": "abc123", "state": "COMMENTED"},
+        ]
+        mock_resp.raise_for_status = MagicMock()
+        client.get = AsyncMock(return_value=mock_resp)
+
+        result = await has_bot_reviewed_commit(client, "owner/repo", 1, "def456")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_for_different_user(self):
+        client = AsyncMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [
+            {"user": {"login": "other-user"}, "commit_id": "abc123", "state": "COMMENTED"},
+        ]
+        mock_resp.raise_for_status = MagicMock()
+        client.get = AsyncMock(return_value=mock_resp)
+
+        result = await has_bot_reviewed_commit(client, "owner/repo", 1, "abc123")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_for_dismissed_review(self):
+        client = AsyncMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [
+            {"user": {"login": "oct-support"}, "commit_id": "abc123", "state": "DISMISSED"},
+        ]
+        mock_resp.raise_for_status = MagicMock()
+        client.get = AsyncMock(return_value=mock_resp)
+
+        result = await has_bot_reviewed_commit(client, "owner/repo", 1, "abc123")
+        assert result is False
