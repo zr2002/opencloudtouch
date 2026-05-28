@@ -53,6 +53,12 @@ MAX_FILE_DIFF_CHARS = 8000
 MAX_TOTAL_DIFF_CHARS = 60000
 
 # Cost tracking — GPT-4o pricing (fallback only, primary is free GitHub Models)
+# Source: https://platform.openai.com/settings/organization/limits
+# Our tier limits for gpt-4o (OpenAI fallback):
+#   - 30,000 TPM (tokens per minute)
+#   - 500 RPM (requests per minute)
+#   - 90,000 TPD (tokens per day)
+# GitHub Models free tier (primary): 150 req/day, rate limits vary by model
 INPUT_COST_PER_TOKEN = 2.50 / 1_000_000
 OUTPUT_COST_PER_TOKEN = 10.00 / 1_000_000
 MONTHLY_BUDGET_USD = 1.00
@@ -376,7 +382,9 @@ async def get_ci_status(client: httpx.AsyncClient, repo: str, commit_sha: str) -
         # Skip our own PR Review checks to avoid circular dependency
         # Job names: "PR Review", "Approve Check", "Comment Trigger"
         # Workflow may prefix with "PR Review (oct-support) / "
-        if "PR Review" in name or "pr-review" in name.lower() or "Approve Check" in name or "Comment Trigger" in name:
+        # Also filter legacy name "AI Review" from old runs still attached to commits
+        if any(skip in name for skip in ("PR Review", "Approve Check", "Comment Trigger", "AI Review")) \
+                or "pr-review" in name.lower():
             continue
 
         if status != "completed":
