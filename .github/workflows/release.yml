@@ -12,6 +12,7 @@
 # ==============================================================================
 
 name: Release
+run-name: "Release · v${{ inputs.release_type == 'patch' && vars.NEXT_PATCH || inputs.release_type == 'minor' && vars.NEXT_MINOR || vars.NEXT_MAJOR }} · ${{ github.ref_name }}"
 
 on:
   workflow_dispatch:
@@ -474,3 +475,21 @@ jobs:
 
           **Release**: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}
           EOF
+
+      - name: Update next-version variables
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.gh-release.outputs.version }}"
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+          gh variable set NEXT_PATCH --body "${MAJOR}.${MINOR}.$((PATCH + 1))"
+          gh variable set NEXT_MINOR --body "${MAJOR}.$((MINOR + 1)).0"
+          gh variable set NEXT_MAJOR --body "$((MAJOR + 1)).0.0"
+
+          echo "Updated version variables:"
+          echo "  NEXT_PATCH = ${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "  NEXT_MINOR = ${MAJOR}.$((MINOR + 1)).0"
+          echo "  NEXT_MAJOR = $((MAJOR + 1)).0.0"
