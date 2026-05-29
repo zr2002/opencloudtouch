@@ -6,8 +6,8 @@ tags: [upgrade, update, migration, version, breaking-change]
 ## Docker Upgrade (recommended)
 
 ```bash
-# Pull the newest version
-docker pull ghcr.io/opencloudtouch/opencloudtouch:latest
+# Pull the newest stable version
+docker pull ghcr.io/opencloudtouch/opencloudtouch:stable
 
 # Stop and remove the old container
 docker stop opencloudtouch
@@ -18,7 +18,7 @@ docker run -d \
   --name opencloudtouch \
   --network host \
   --restart unless-stopped \
-  ghcr.io/opencloudtouch/opencloudtouch:latest
+  ghcr.io/opencloudtouch/opencloudtouch:stable
 ```
 
 Or with Docker Compose:

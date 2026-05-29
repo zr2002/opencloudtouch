@@ -8,15 +8,15 @@ Welcome to OpenCloudTouch! Here's how to get started:
 ## Quick Start with Docker
 
 ```bash
-# Pull the latest image
-docker pull ghcr.io/opencloudtouch/opencloudtouch:latest
+# Pull the stable image (recommended)
+docker pull ghcr.io/opencloudtouch/opencloudtouch:stable
 
 # Run with host networking (required for SSDP discovery)
 docker run -d \
   --name opencloudtouch \
   --network host \
   --restart unless-stopped \
-  ghcr.io/opencloudtouch/opencloudtouch:latest
+  ghcr.io/opencloudtouch/opencloudtouch:stable
 ```
 
 ## Docker Compose
@@ -26,7 +26,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   opencloudtouch:
-    image: ghcr.io/opencloudtouch/opencloudtouch:latest
+    image: ghcr.io/opencloudtouch/opencloudtouch:stable
     network_mode: host
     restart: unless-stopped
 ```
