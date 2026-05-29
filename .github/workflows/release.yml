@@ -31,7 +31,7 @@ on:
         type: boolean
         default: false
       mark_as_stable:
-        description: 'Tag Docker image as "stable" (only after burn-in period)'
+        description: 'Tag Docker image as "stable"'
         required: false
         type: boolean
         default: false
