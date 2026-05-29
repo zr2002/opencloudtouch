@@ -1,9 +1,12 @@
 # Pre-commit hooks configuration
 # See https://pre-commit.com for more information
 
-# Abort immediately on first hook failure (don't waste time on tests if
-# formatters/line-ending fixers modified files — just re-stage and retry).
+# Abort immediately on first hook failure.
 fail_fast: true
+
+# NOTE: Formatters (black, prettier, ruff --fix, trailing-whitespace,
+# end-of-file-fixer, mixed-line-ending) have been moved to a CI autoformat
+# job that commits fixes back to the branch.  See .github/workflows/ci.yml.
 
 repos:
   # ============================================================================
@@ -19,42 +22,15 @@ repos:
         pass_filenames: false
 
   # ============================================================================
-  # FORMATTERS & FIXERS (run FIRST — may modify files, fail_fast aborts early)
+  # LINT-ONLY (no auto-fix — formatting is handled by CI autoformat job)
   # ============================================================================
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-      - id: trailing-whitespace
-        exclude: '\.md$'
-      - id: end-of-file-fixer
-        exclude: '\.min\.(js|css)$'
-      - id: mixed-line-ending
-        args: ['--fix=lf']
-
-  - repo: https://github.com/psf/black
-    rev: 26.1.0
-    hooks:
-      - id: black
-        name: Format Python code (black)
-        files: ^apps/backend/
-        language_version: python3.13
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.0
     hooks:
       - id: ruff
-        name: Lint Python code (ruff)
+        name: Lint Python code (ruff, no auto-fix)
         files: ^apps/backend/
-        args: [--fix, --exit-non-zero-on-fix]
-
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
-    hooks:
-      - id: prettier
-        name: Format frontend code (prettier)
-        files: ^apps/frontend/src/.*\.(js|jsx|ts|tsx|json|css)$
-        additional_dependencies:
-          - prettier@3.4.2
+        args: []
 
   # ============================================================================
   # VALIDATORS (read-only checks — no file modifications)
@@ -89,7 +65,7 @@ repos:
         stages: [commit-msg]
 
   # ============================================================================
-  # TESTS & LINTERS (only run if all formatters passed cleanly)
+  # TESTS & LINTERS
   # ============================================================================
   - repo: local
     hooks:

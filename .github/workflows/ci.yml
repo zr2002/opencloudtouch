@@ -58,48 +58,12 @@ jobs:
         run: npm audit --production --audit-level=high
 
   # ============================================================================
-  # CODE FORMATTING
-  # ============================================================================
-  format:
-    name: Check Formatting
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-
-      - name: Install black
-        run: pip install black==26.1.0
-
-      - name: Check Python formatting
-        run: black --check apps/backend/
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
-
-      - name: Install frontend dependencies
-        run: npm ci --prefer-offline
-
-      - name: Check TypeScript/React formatting
-        working-directory: apps/frontend
-        run: npx prettier --check "src/**/*.{js,jsx,ts,tsx,json,css}"
-
-  # ============================================================================
   # LINTING
   # ============================================================================
   lint:
     name: Lint Code
     runs-on: ubuntu-latest
-    needs: [security, format]
+    needs: [security]
 
     steps:
       - name: Checkout code
@@ -136,7 +100,7 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
-    needs: [security, format]
+    needs: [security]
 
     steps:
       - name: Checkout code
@@ -184,7 +148,7 @@ jobs:
   frontend-tests:
     name: Frontend Tests
     runs-on: ubuntu-latest
-    needs: [security, format]
+    needs: [security]
 
     steps:
       - name: Checkout code
@@ -217,12 +181,16 @@ jobs:
           retention-days: 1
 
   # ============================================================================
-  # E2E TESTS (Mock backend - no real devices)
+  # E2E TESTS (Mock backend - parallelised across 5 shards)
   # ============================================================================
   e2e-tests:
-    name: E2E Tests
+    name: E2E Tests (${{ matrix.shard }}/10)
     runs-on: ubuntu-latest
-    needs: [security, format]
+    needs: [security]
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     steps:
       - name: Checkout code
@@ -277,7 +245,70 @@ jobs:
       - name: Run Cypress E2E tests
         id: cypress
         working-directory: apps/frontend
-        run: npm run test:e2e
+        run: |
+          # Collect all spec files
+          SPECS=($(find tests/e2e -name '*.cy.ts' -not -path '*/support/*' | sort))
+          TOTAL=${#SPECS[@]}
+          SHARD=${{ matrix.shard }}
+          
+          # Python script to distribute specs across 10 shards with pattern [1,2,1,2,1,2,1,2,1,2]
+          SELECTED=$(python3 -c "
+          specs = '''${SPECS[*]}'''.split()
+          shard = $SHARD - 1  # 0-indexed
+          total = len(specs)
+          
+          # Pattern: Fill even-position shards first (indices 1,3,5,7,9),
+          # then odd-position shards (indices 0,2,4,6,8)
+          dist = [0] * 10
+          remaining = total
+          
+          # Phase 1: Fill even-position shards (indices 1,3,5,7,9)
+          even_positions = [1, 3, 5, 7, 9]
+          for pos in even_positions:
+              if remaining > 0:
+                  dist[pos] = 1
+                  remaining -= 1
+          
+          # Phase 2: Fill odd-position shards (indices 0,2,4,6,8)
+          odd_positions = [0, 2, 4, 6, 8]
+          for pos in odd_positions:
+              if remaining > 0:
+                  dist[pos] = 1
+                  remaining -= 1
+          
+          # Phase 3: Increment even-positions again (1→2)
+          for pos in even_positions:
+              if remaining > 0:
+                  dist[pos] += 1
+                  remaining -= 1
+          
+          # Phase 4: Increment odd-positions (1→2)
+          for pos in odd_positions:
+              if remaining > 0:
+                  dist[pos] += 1
+                  remaining -= 1
+          
+          # Continue pattern for higher counts
+          while remaining > 0:
+              for pos in even_positions:
+                  if remaining > 0:
+                      dist[pos] += 1
+                      remaining -= 1
+              for pos in odd_positions:
+                  if remaining > 0:
+                      dist[pos] += 1
+                      remaining -= 1
+          
+          # Calculate start position and count for this shard
+          start = sum(dist[:shard])
+          count = dist[shard]
+          selected = specs[start:start+count]
+          
+          print(','.join(selected))
+          ")
+          
+          echo "Shard $SHARD/10 ($(echo "$SELECTED" | tr ',' '\n' | wc -l) specs) — running: $SELECTED"
+          npx cypress run --spec "$SELECTED" --browser chrome --headless
         env:
           CYPRESS_BASE_URL: http://localhost:4173
           CYPRESS_API_URL: http://localhost:7778/api
@@ -286,7 +317,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: failure() && steps.cypress.outcome == 'failure'
         with:
-          name: cypress-screenshots
+          name: cypress-screenshots-shard-${{ matrix.shard }}
           path: apps/frontend/tests/e2e/screenshots
           retention-days: 7
 
@@ -339,7 +370,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [security, format, lint, backend-tests, frontend-tests, e2e-tests]
+    needs: [security, lint, backend-tests, frontend-tests, e2e-tests]
     if: always()
     permissions:
       pull-requests: write
@@ -366,7 +397,6 @@ jobs:
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scan | ${{ needs.security.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Format Check  | ${{ needs.format.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Lint          | ${{ needs.lint.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Backend Tests | ${{ needs.backend-tests.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Frontend Tests| ${{ needs.frontend-tests.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
@@ -388,7 +418,6 @@ jobs:
         # on core jobs to avoid redundant red marks.
         run: |
           if [[ "${{ needs.security.result }}" != "success" ]] || \
-             [[ "${{ needs.format.result }}" != "success" ]] || \
              [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.backend-tests.result }}" != "success" ]] || \
              [[ "${{ needs.frontend-tests.result }}" != "success" ]]; then
@@ -403,7 +432,6 @@ jobs:
             const statusIcon = (result) => result === 'success' ? '✅' : result === 'skipped' ? '⏭️' : '❌';
             const jobs = [
               ['Security Scan', '${{ needs.security.result }}'],
-              ['Format Check', '${{ needs.format.result }}'],
               ['Lint', '${{ needs.lint.result }}'],
               ['Backend Tests', '${{ needs.backend-tests.result }}'],
               ['Frontend Tests', '${{ needs.frontend-tests.result }}'],
@@ -447,3 +475,95 @@ jobs:
                 body: body,
               });
             }
+
+  # ============================================================================
+  # AUTO-FORMAT (runs at the end — commits formatting fixes back to branch)
+  #
+  # Pushes with GITHUB_TOKEN → does NOT trigger another workflow run.
+  # Skipped for fork PRs (no push permission on head branch).
+  # ============================================================================
+  autoformat:
+    name: Auto-format
+    runs-on: ubuntu-latest
+    needs: [lint, backend-tests, frontend-tests, e2e-tests]
+    if: |
+      always() && !cancelled() &&
+      (github.event_name == 'push' ||
+       github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository))
+    permissions:
+      contents: write
+
+    steps:
+      - name: Determine branch ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.ref.outputs.branch }}
+          token: ${{ secrets.BOT_PAT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install formatting tools
+        run: |
+          pip install black==26.1.0 ruff==0.15.0
+          npm ci --prefer-offline
+
+      - name: Run formatters
+        run: |
+          # Python
+          black apps/backend/
+          ruff check --fix apps/backend/ || true
+
+          # Frontend
+          cd apps/frontend
+          npx prettier --write "src/**/*.{js,jsx,ts,tsx,json,css}"
+          cd ..
+
+      - name: Fix trailing whitespace & line endings
+        run: |
+          # Trailing whitespace (exclude markdown, binary, node_modules, .git, .github)
+          find . -type f \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' \
+            -o -name '*.js' -o -name '*.jsx' -o -name '*.css' \
+            -o -name '*.yml' -o -name '*.yaml' -o -name '*.json' \) \
+            -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.github/*' \
+            -exec sed -i 's/[[:space:]]*$//' {} + || true
+
+          # Ensure final newline (exclude .github workflows)
+          find . -type f \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' \
+            -o -name '*.js' -o -name '*.jsx' \) \
+            -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.github/*' \
+            -exec bash -c 'for f; do [ -s "$f" ] && [ "$(tail -c1 "$f")" != "" ] && echo >> "$f"; done' _ {} + || true
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "formatter-bot"
+          git config user.email "noreply@opencloudtouch.org"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "✅ No formatting changes needed"
+          else
+            echo "📝 Formatting changes detected — committing"
+            git diff --cached --stat
+            git commit -m "style: auto-format code [formatter-bot]"
+            git push origin ${{ steps.ref.outputs.branch }}
+          fi
