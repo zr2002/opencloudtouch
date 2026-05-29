@@ -497,13 +497,13 @@ jobs:
             -o -name '*.js' -o -name '*.jsx' -o -name '*.css' \
             -o -name '*.yml' -o -name '*.yaml' -o -name '*.json' \) \
             -not -path '*/node_modules/*' -not -path '*/.git/*' \
-            -exec sed -i 's/[[:space:]]*$//' {} +
+            -exec sed -i 's/[[:space:]]*$//' {} + || true
 
           # Ensure final newline
           find . -type f \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' \
             -o -name '*.js' -o -name '*.jsx' \) \
             -not -path '*/node_modules/*' -not -path '*/.git/*' \
-            -exec bash -c 'for f; do [ -s "$f" ] && [ "$(tail -c1 "$f")" != "" ] && echo >> "$f"; done' _ {} +
+            -exec bash -c 'for f; do [ -s "$f" ] && [ "$(tail -c1 "$f")" != "" ] && echo >> "$f"; done' _ {} + || true
 
       - name: Commit and push if changed
         run: |
