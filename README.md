@@ -52,7 +52,7 @@ docker run -d \
   --network host \
   -v opencloudtouch-data:/data \
   -e OCT_DISCOVERY_ENABLED=true \
-  ghcr.io/opencloudtouch/opencloudtouch:latest
+  ghcr.io/opencloudtouch/opencloudtouch:stable
 ```
 
 Open **http://localhost:7777** in your browser.
@@ -65,7 +65,7 @@ docker run -d \
   --network host \
   -v opencloudtouch-data:/data \
   -e OCT_DISCOVERY_ENABLED=true \
-  ghcr.io/opencloudtouch/opencloudtouch:latest
+  ghcr.io/opencloudtouch/opencloudtouch:stable
 ```
 
 Or use the provided compose file (pull mode, no build required):

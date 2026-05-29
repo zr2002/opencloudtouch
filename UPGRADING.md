@@ -12,9 +12,9 @@ This guide explains how to upgrade OpenCloudTouch deployments. It covers Docker-
 
 ### Steps
 
-1. **Pull the latest image:**
+1. **Pull the latest stable image:**
    ```sh
-   docker pull ghcr.io/opencloudtouch/opencloudtouch:latest
+   docker pull ghcr.io/opencloudtouch/opencloudtouch:stable
    ```
 2. **Restart with Docker Compose:**
    ```sh
