@@ -22,10 +22,10 @@ jobs:
   triage:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Skip PR comments — those are handled by pr-review.yml
+    # Skip PR comments (handled by pr-review.yml) and bot's own comments (prevent loops)
     if: >-
-      github.event_name != 'issue_comment'
-      || !github.event.issue.pull_request
+      (github.event_name != 'issue_comment' || !github.event.issue.pull_request)
+      && (github.event_name != 'issue_comment' || github.event.comment.user.login != 'scheilch')
 
     steps:
       - name: Checkout repository
