@@ -12,37 +12,37 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from opencloudtouch import __version__, is_official_build
 from opencloudtouch.api import devices_router
+from opencloudtouch.api.bug_report import router as bug_report_router
 from opencloudtouch.bmx.radiobrowser_routes import radiobrowser_router
 from opencloudtouch.bmx.resolve_routes import resolve_router
-from opencloudtouch.devices.api.discovery_routes import discovery_router
-from opencloudtouch.devices.api.event_routes import event_router
 from opencloudtouch.bmx.routes import router as bmx_router
 from opencloudtouch.core.config import get_config, init_config
-from opencloudtouch import __version__, is_official_build
 from opencloudtouch.core.exception_handlers import (
     register_exception_handlers,  # re-exported for backward compat
 )
 from opencloudtouch.core.logging import setup_logging
 from opencloudtouch.core.logs_routes import router as logs_router
-from opencloudtouch.api.bug_report import router as bug_report_router
 from opencloudtouch.core.static_files import (
     find_frontend_static_dir,
     mount_static_files,
 )
 from opencloudtouch.db import DeviceRepository
 from opencloudtouch.devices.adapter import get_discovery_adapter
-from opencloudtouch.devices.health_check import DeviceHealthCheck
-from opencloudtouch.devices.state import DeviceStateManager
-from opencloudtouch.devices.startup_check import StartupCheck
+from opencloudtouch.devices.api.discovery_routes import discovery_router
+from opencloudtouch.devices.api.event_routes import event_router
 from opencloudtouch.devices.api.preset_stream_routes import (
     descriptor_router as device_descriptor_router,
 )
 from opencloudtouch.devices.api.preset_stream_routes import (
     router as device_preset_stream_router,
 )
+from opencloudtouch.devices.health_check import DeviceHealthCheck
 from opencloudtouch.devices.service import DeviceService
 from opencloudtouch.devices.services.sync_service import DeviceSyncService
+from opencloudtouch.devices.startup_check import StartupCheck
+from opencloudtouch.devices.state import DeviceStateManager
 from opencloudtouch.marge.routes import router as marge_router
 from opencloudtouch.marge.service import MargeService
 from opencloudtouch.presets.api.playlist_routes import router as playlist_router
@@ -50,9 +50,9 @@ from opencloudtouch.presets.api.routes import router as presets_router
 from opencloudtouch.presets.api.station_routes import router as stations_router
 from opencloudtouch.presets.repository import PresetRepository
 from opencloudtouch.presets.service import PresetService
+from opencloudtouch.radio.api.routes import router as radio_router
 from opencloudtouch.recents.repository import RecentsRepository
 from opencloudtouch.recents.service import RecentsService
-from opencloudtouch.radio.api.routes import router as radio_router
 from opencloudtouch.settings.repository import SettingsRepository
 from opencloudtouch.settings.routes import router as settings_router
 from opencloudtouch.settings.service import SettingsService
@@ -63,7 +63,9 @@ from opencloudtouch.setup.wizard_service import WizardService
 from opencloudtouch.swupdate.routes import router as swupdate_router
 from opencloudtouch.wizard_audit.repository import WizardAuditRepository
 from opencloudtouch.wizard_audit.routes import audit_router as wizard_audit_router
-from opencloudtouch.zones.routes import device_zone_router, router as zones_router
+from opencloudtouch.zones.repository import ZoneRepository
+from opencloudtouch.zones.routes import device_zone_router
+from opencloudtouch.zones.routes import router as zones_router
 from opencloudtouch.zones.service import ZoneService
 
 # Module-level logger
@@ -73,12 +75,23 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
     init_config()
     setup_logging()
 
     logger = logging.getLogger(__name__)
     cfg = get_config()
     _log_startup_info(logger, cfg)
+
+    # Performance: Increase thread pool for parallel Bose device I/O
+    # Default ~5-8 workers causes serial bottleneck with >5 devices
+    # 30 workers allows up to 30 parallel asyncio.to_thread() calls
+    loop = asyncio.get_running_loop()
+    executor = ThreadPoolExecutor(max_workers=30, thread_name_prefix="bose-io")
+    loop.set_default_executor(executor)
+    logger.info("Thread pool configured: 30 workers for Bose device I/O")
 
     # Startup: repositories → services → background tasks
     repos = await _init_repositories(app, cfg, logger)
@@ -88,6 +101,8 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     await _shutdown(app, repos, logger)
+    executor.shutdown(wait=True)
+    logger.info("Thread pool shutdown complete")
 
 
 def _log_startup_info(logger: logging.Logger, cfg) -> None:
@@ -118,6 +133,7 @@ async def _init_repositories(app: FastAPI, cfg, logger: logging.Logger) -> dict:
         ("preset_repo", PresetRepository, cfg.effective_db_path),
         ("recents_repo", RecentsRepository, cfg.effective_db_path),
         ("wizard_audit_repo", WizardAuditRepository, cfg.effective_db_path),
+        ("zone_repo", ZoneRepository, cfg.effective_db_path),
     ]
 
     repos = {}
@@ -171,8 +187,10 @@ async def _init_services(
     # Zone service (with injected client factory to avoid circular deps)
     from opencloudtouch.devices.adapter import get_device_client
 
+    zone_repo = repos["zone_repo"]
     app.state.zone_service = ZoneService(
         device_repo=device_repo,
+        zone_repo=zone_repo,
         client_factory=get_device_client,
     )
     logger.info("ZoneService initialized")
@@ -219,7 +237,8 @@ async def _init_services(
         logger.info("Startup device check completed")
 
     # Background health-check (not in mock/CI mode)
-    health_check = DeviceHealthCheck(device_repo)
+    zone_repo = repos.get("zone_repo")
+    health_check = DeviceHealthCheck(device_repo, zone_repo=zone_repo)
     if not cfg.mock_mode:
         health_check.start()
         logger.info("Device health-check started")
