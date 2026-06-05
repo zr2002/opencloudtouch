@@ -652,6 +652,7 @@
     "hallOfFameTitle": "殿堂入り",
     "hallOfFameDescription": "歴代トップ3の貢献者 — 卓越した技術的影響力で認められています。",
     "supportersTitle": "支援者",
+    "reportBug": "バグ報告",
     "supportersDescription": "OpenCloudTouchを財政的に支援してくださる皆様に感謝します。皆様の貢献がプロジェクトを支えています！",
     "supportersMonthly": "月額支援者",
     "supportersOneTime": "一回限りの支援者",
@@ -659,12 +660,7 @@
     "checkingUpdates": "アップデート確認中...",
     "updateAvailable": "アップデート可能：{{version}}",
     "viewRelease": "リリースを表示",
-    "upToDate": "最新版です！",
-    "monthlySupporters": "月額支援者",
-    "oneTimeSupporters": "一回限りの支援者",
-    "noSupportersYet": "まだ支援者はいません",
-    "supportCTA": "このプロジェクトを支援しますか？",
-    "supportButton": "コーヒーをおごる"
+    "upToDate": "最新版です！"
   },
   "discovery": {
     "alreadyRunning": "デバイス検索はすでに実行中です。お待ちください...",

@@ -79,8 +79,14 @@ def _serve_static_file(static_dir: Path, decoded_path: str) -> FileResponse | No
         requested_path = (static_dir / decoded_path).resolve()
         if str(requested_path).startswith(str(static_dir)) and requested_path.is_file():
             headers = {}
-            if requested_path.name == "index.html":
-                headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            # Never cache index.html or CSV files — deploys must take effect immediately
+            if requested_path.name in ("index.html", "supporters.csv"):
+                # Aggressive cache prevention (HTTP/1.1 + HTTP/1.0 + proxies)
+                headers["Cache-Control"] = (
+                    "no-cache, no-store, must-revalidate, max-age=0"
+                )
+                headers["Pragma"] = "no-cache"  # HTTP/1.0 fallback
+                headers["Expires"] = "0"  # Proxies
             return FileResponse(requested_path, headers=headers)
     except (ValueError, OSError):
         pass  # Invalid path or I/O error — fall through to 404

@@ -652,6 +652,7 @@
     "hallOfFameTitle": "Panthéon",
     "hallOfFameDescription": "Les 3 meilleurs contributeurs de tous les temps — reconnus pour leur impact technique exceptionnel.",
     "supportersTitle": "Supporters",
+    "reportBug": "Signaler un bug",
     "supportersDescription": "Merci à tous ceux qui soutiennent OpenCloudTouch financièrement. Vos contributions aident à maintenir le projet en vie !",
     "supportersMonthly": "Supporters Mensuels",
     "supportersOneTime": "Supporters ponctuels",
@@ -659,12 +660,7 @@
     "checkingUpdates": "Vérification des mises à jour...",
     "updateAvailable": "Mise à jour disponible : {{version}}",
     "viewRelease": "Voir la version",
-    "upToDate": "Vous êtes à jour !",
-    "monthlySupporters": "Supporters mensuels",
-    "oneTimeSupporters": "Supporters ponctuels",
-    "noSupportersYet": "Pas encore de supporters",
-    "supportCTA": "Vous souhaitez aider à maintenir ce projet en vie ?",
-    "supportButton": "Offrez-moi un café"
+    "upToDate": "Vous êtes à jour !"
   },
   "discovery": {
     "alreadyRunning": "Recherche d'appareils déjà en cours. Veuillez patienter...",

@@ -652,6 +652,7 @@
     "hallOfFameTitle": "Hall of Fame",
     "hallOfFameDescription": "Top 3 Mitwirkende aller Zeiten — anerkannt für außergewöhnlichen technischen Impact.",
     "supportersTitle": "Unterstützer",
+    "reportBug": "Problem melden",
     "supportersDescription": "Vielen Dank an alle, die OpenCloudTouch finanziell unterstützen. Eure Beiträge helfen das Projekt am Leben zu erhalten!",
     "supportersMonthly": "Monatliche Unterstützer",
     "supportersOneTime": "Einmalige Unterstützer",
@@ -659,12 +660,7 @@
     "checkingUpdates": "Suche nach Updates...",
     "updateAvailable": "Update verfügbar: {{version}}",
     "viewRelease": "Release ansehen",
-    "upToDate": "Du bist auf dem neuesten Stand!",
-    "monthlySupporters": "Monatliche Unterstützer",
-    "oneTimeSupporters": "Einmalige Unterstützer",
-    "noSupportersYet": "Noch keine Unterstützer",
-    "supportCTA": "Möchtest du helfen, dieses Projekt am Leben zu erhalten?",
-    "supportButton": "Kauf mir einen Kaffee"
+    "upToDate": "Du bist auf dem neuesten Stand!"
   },
   "discovery": {
     "alreadyRunning": "Gerätesuche läuft bereits. Bitte warten...",

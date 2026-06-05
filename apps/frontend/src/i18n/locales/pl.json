@@ -652,6 +652,7 @@
     "hallOfFameTitle": "Galeria Sław",
     "hallOfFameDescription": "Top 3 współtwórców wszech czasów — uznanych za wyjątkowy wpływ techniczny.",
     "supportersTitle": "Sponsorzy",
+    "reportBug": "Zgłoś błąd",
     "supportersDescription": "Dziękujemy wszystkim, którzy wspierają OpenCloudTouch finansowo. Wasze wkłady pomagają utrzymać projekt przy życiu!",
     "supportersMonthly": "Miesięczni Sponsorzy",
     "supportersOneTime": "Jednorazowi Sponsorzy",
@@ -659,12 +660,7 @@
     "checkingUpdates": "Sprawdzanie aktualizacji...",
     "updateAvailable": "Dostępna aktualizacja: {{version}}",
     "viewRelease": "Zobacz wydanie",
-    "upToDate": "Jesteś na bieżąco!",
-    "monthlySupporters": "Miesięczni Sponsorzy",
-    "oneTimeSupporters": "Jednorazowi Sponsorzy",
-    "noSupportersYet": "Jeszcze brak sponsorów",
-    "supportCTA": "Chcesz pomóc utrzymać ten projekt?",
-    "supportButton": "Postaw mi kawę"
+    "upToDate": "Jesteś na bieżąco!"
   },
   "discovery": {
     "alreadyRunning": "Wyszukiwanie urządzeń już trwa. Poczekaj...",

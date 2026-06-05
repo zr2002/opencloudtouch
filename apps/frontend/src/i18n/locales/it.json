@@ -652,6 +652,7 @@
     "hallOfFameTitle": "Hall of Fame",
     "hallOfFameDescription": "I 3 migliori contributori di sempre — riconosciuti per il loro eccezionale impatto tecnico.",
     "supportersTitle": "Sostenitori",
+    "reportBug": "Segnala bug",
     "supportersDescription": "Grazie a tutti coloro che sostengono OpenCloudTouch finanziariamente. I vostri contributi aiutano a mantenere vivo il progetto!",
     "supportersMonthly": "Sostenitori Mensili",
     "supportersOneTime": "Sostenitori Una Tantum",
@@ -659,12 +660,7 @@
     "checkingUpdates": "Controllo aggiornamenti...",
     "updateAvailable": "Aggiornamento disponibile: {{version}}",
     "viewRelease": "Visualizza versione",
-    "upToDate": "Sei aggiornato!",
-    "monthlySupporters": "Sostenitori Mensili",
-    "oneTimeSupporters": "Sostenitori Una Tantum",
-    "noSupportersYet": "Nessun sostenitore ancora",
-    "supportCTA": "Vuoi aiutare a mantenere questo progetto in vita?",
-    "supportButton": "Offrimi un caffè"
+    "upToDate": "Sei aggiornato!"
   },
   "discovery": {
     "alreadyRunning": "Ricerca dispositivi già in corso. Attendere...",

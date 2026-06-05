@@ -652,6 +652,7 @@
     "hallOfFameTitle": "Eregalerij",
     "hallOfFameDescription": "Top 3 bijdragers aller tijden — erkend voor uitzonderlijke technische impact.",
     "supportersTitle": "Supporters",
+    "reportBug": "Bug melden",
     "supportersDescription": "Dank aan iedereen die OpenCloudTouch financieel steunt. Jullie bijdragen helpen het project levend te houden!",
     "supportersMonthly": "Maandelijkse Supporters",
     "supportersOneTime": "Eenmalige supporters",
@@ -659,12 +660,7 @@
     "checkingUpdates": "Controleren op updates...",
     "updateAvailable": "Update beschikbaar: {{version}}",
     "viewRelease": "Release bekijken",
-    "upToDate": "Je bent up-to-date!",
-    "monthlySupporters": "Maandelijkse supporters",
-    "oneTimeSupporters": "Eenmalige supporters",
-    "noSupportersYet": "Nog geen supporters",
-    "supportCTA": "Wil je helpen dit project in leven te houden?",
-    "supportButton": "Koop me een koffie"
+    "upToDate": "Je bent up-to-date!"
   },
   "discovery": {
     "alreadyRunning": "Apparaatzoektocht loopt al. Wacht even...",

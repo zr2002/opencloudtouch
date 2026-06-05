@@ -652,6 +652,7 @@
     "hallOfFameTitle": "Hall of Fame",
     "hallOfFameDescription": "Topp 3 bidragsgivare genom tiderna — erkända för exceptionell teknisk påverkan.",
     "supportersTitle": "Supportrar",
+    "reportBug": "Rapportera bugg",
     "supportersDescription": "Tack till alla som stödjer OpenCloudTouch ekonomiskt. Era bidrag hjälper till att hålla projektet vid liv!",
     "supportersMonthly": "Månatliga Supportrar",
     "supportersOneTime": "Engångssupportrar",
@@ -659,12 +660,7 @@
     "checkingUpdates": "Söker efter uppdateringar...",
     "updateAvailable": "Uppdatering tillgänglig: {{version}}",
     "viewRelease": "Visa version",
-    "upToDate": "Du är uppdaterad!",
-    "monthlySupporters": "Månatliga supportrar",
-    "oneTimeSupporters": "Engångssupportrar",
-    "noSupportersYet": "Inga supportrar ännu",
-    "supportCTA": "Vill du hjälpa till att hålla detta projekt vid liv?",
-    "supportButton": "Bjud mig på en kaffe"
+    "upToDate": "Du är uppdaterad!"
   },
   "discovery": {
     "alreadyRunning": "Enhetssökning pågår redan. Vänta...",
