@@ -15,7 +15,9 @@
     "reloadPage": "Pagina opnieuw laden",
     "stationNotFound": "Station niet gevonden.",
     "saveAsPreset": "Opslaan als preset",
-    "or": "of"
+    "or": "of",
+    "enabled": "Ingeschakeld",
+    "disabled": "Uitgeschakeld"
   },
   "nav": {
     "presets": "Presets",
@@ -655,6 +657,7 @@
     "hallOfFameDescription": "Top 3 bijdragers aller tijden — erkend voor uitzonderlijke technische impact.",
     "supportersTitle": "Supporters",
     "reportBug": "Bug melden",
+    "diagnostics": "Diagnostiek",
     "supportersDescription": "Dank aan iedereen die OpenCloudTouch financieel steunt. Jullie bijdragen helpen het project levend te houden!",
     "supportersMonthly": "Maandelijkse Supporters",
     "supportersOneTime": "Eenmalige supporters",
@@ -731,5 +734,24 @@
     "submitFailed": "Bugrapport verzenden mislukt: {{error}}",
     "diagnosticsSuccess": "Diagnostiek gedownload! Voeg het .log.gz-bestand toe aan uw GitHub-issue.",
     "diagnosticsFailed": "Diagnostiek downloaden mislukt: {{error}}"
+  },
+  "diagnostics": {
+    "title": "Diagnostiek",
+    "serverInfo": "Serverinformatie",
+    "version": "Versie",
+    "python": "Python",
+    "platform": "Platform",
+    "discovery": "Detectie",
+    "logLevel": "Logniveau",
+    "manualIPs": "Handmatige IPs",
+    "database": "Database",
+    "devicesCount": "Apparaten",
+    "presetsCount": "Presets",
+    "devices": "Apparaten",
+    "noDevices": "Geen apparaten gevonden",
+    "firmware": "Firmware",
+    "setupStatus": "Configuratiestatus",
+    "lastSeen": "Laatst gezien",
+    "downloadBundle": "Ondersteuningsbundel downloaden"
   }
 }

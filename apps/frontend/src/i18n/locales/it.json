@@ -15,7 +15,9 @@
     "reloadPage": "Ricarica pagina",
     "stationNotFound": "Stazione non trovata.",
     "saveAsPreset": "Salva come preset",
-    "or": "o"
+    "or": "o",
+    "enabled": "Attivato",
+    "disabled": "Disattivato"
   },
   "nav": {
     "presets": "Preset",
@@ -655,6 +657,7 @@
     "hallOfFameDescription": "I 3 migliori contributori di sempre — riconosciuti per il loro eccezionale impatto tecnico.",
     "supportersTitle": "Sostenitori",
     "reportBug": "Segnala bug",
+    "diagnostics": "Diagnostica",
     "supportersDescription": "Grazie a tutti coloro che sostengono OpenCloudTouch finanziariamente. I vostri contributi aiutano a mantenere vivo il progetto!",
     "supportersMonthly": "Sostenitori Mensili",
     "supportersOneTime": "Sostenitori Una Tantum",
@@ -731,5 +734,24 @@
     "submitFailed": "Invio segnalazione bug fallito: {{error}}",
     "diagnosticsSuccess": "Diagnostica scaricata! Allega il file .log.gz alla tua issue GitHub.",
     "diagnosticsFailed": "Download diagnostica fallito: {{error}}"
+  },
+  "diagnostics": {
+    "title": "Diagnostica",
+    "serverInfo": "Informazioni server",
+    "version": "Versione",
+    "python": "Python",
+    "platform": "Piattaforma",
+    "discovery": "Rilevamento",
+    "logLevel": "Livello log",
+    "manualIPs": "IP manuali",
+    "database": "Database",
+    "devicesCount": "Dispositivi",
+    "presetsCount": "Preset",
+    "devices": "Dispositivi",
+    "noDevices": "Nessun dispositivo trovato",
+    "firmware": "Firmware",
+    "setupStatus": "Stato configurazione",
+    "lastSeen": "Ultimo accesso",
+    "downloadBundle": "Scarica bundle di supporto"
   }
 }
