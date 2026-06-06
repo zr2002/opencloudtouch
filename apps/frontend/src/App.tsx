@@ -102,51 +102,69 @@ function AppRouter({ devices: initialDevices, isLoading, error, onRetry }: AppRo
     );
   }
   return (
-    <div className="app">
-      <header className="app-header" data-test="app-header">
-        <Navigation />
-      </header>
-      <main className="app-main">
-        <Routes>
-          {/* Setup Wizard — always available, manages its own loading/empty states */}
-          <Route
-            path="/setup-wizard"
-            element={<SetupWizard devices={devices} isLoading={false} />}
-          />
+    <Routes>
+      {/* Welcome Screen - shown when no devices, rendered WITHOUT NavBar/main */}
+      <Route
+        path="/welcome"
+        element={
+          devices.length === 0 ? (
+            <div className="app">
+              <EmptyState />
+            </div>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
 
-          {/* Welcome Screen - shown when no devices */}
-          <Route
-            path="/welcome"
-            element={devices.length === 0 ? <EmptyState /> : <Navigate to="/" replace />}
-          />
+      {/* All other routes - with NavBar and main wrapper */}
+      <Route
+        path="/*"
+        element={
+          <div className="app">
+            <header className="app-header" data-test="app-header">
+              <Navigation />
+            </header>
+            <main className="app-main">
+              <Routes>
+                {/* Setup Wizard — always available, manages its own loading/empty states */}
+                <Route
+                  path="/setup-wizard"
+                  element={<SetupWizard devices={devices} isLoading={false} />}
+                />
 
-          {/* Main App Routes - require devices */}
-          <Route
-            path="/*"
-            element={
-              devices.length > 0 ? (
-                <Routes>
-                  <Route
-                    path="/"
-                    element={<RadioPresets devices={devices} onRemoveDevice={handleRemoveDevice} />}
-                  />
-                  <Route path="/local" element={<LocalControl devices={devices} />} />
-                  <Route path="/multiroom" element={<MultiRoom devices={devices} />} />
-                  <Route path="/firmware" element={<Firmware devices={devices} />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/diagnostics" element={<Diagnostics />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/licenses" element={<Licenses />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              ) : (
-                <Navigate to="/welcome" replace />
-              )
-            }
-          />
-        </Routes>
-      </main>
-    </div>
+                {/* Main App Routes - require devices */}
+                <Route
+                  path="/*"
+                  element={
+                    devices.length > 0 ? (
+                      <Routes>
+                        <Route
+                          path="/"
+                          element={
+                            <RadioPresets devices={devices} onRemoveDevice={handleRemoveDevice} />
+                          }
+                        />
+                        <Route path="/local" element={<LocalControl devices={devices} />} />
+                        <Route path="/multiroom" element={<MultiRoom devices={devices} />} />
+                        <Route path="/firmware" element={<Firmware devices={devices} />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="/diagnostics" element={<Diagnostics />} />
+                        <Route path="/about" element={<About />} />
+                        <Route path="/licenses" element={<Licenses />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    ) : (
+                      <Navigate to="/welcome" replace />
+                    )
+                  }
+                />
+              </Routes>
+            </main>
+          </div>
+        }
+      />
+    </Routes>
   );
 }
 
