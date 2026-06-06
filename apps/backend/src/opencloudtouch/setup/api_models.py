@@ -492,3 +492,72 @@ class VerifySetupResponse(BaseModel):
     passed_count: int = 0
     failed_count: int = 0
     message: str = ""
+
+
+# ============================================================================
+# DNS Hostname Validation (Issue #295)
+# ============================================================================
+
+
+class ValidateHostnameRequest(BaseModel):
+    """Request to validate a hostname or IP via DNS resolution and OCT reachability.
+
+    Accepts both hostnames (e.g. 'hera', 'myserver.local') and IP addresses
+    (e.g. '192.168.1.100'). For IPs, DNS resolution is skipped but OCT
+    reachability is still checked.
+    """
+
+    hostname: str = Field(
+        ...,
+        description="Hostname or IP address to validate (e.g. 'hera', 'myserver.local', or '192.168.1.100')",
+        min_length=1,
+        max_length=255,
+    )
+    port: int = Field(
+        7777,
+        description="Port to check for OCT reachability (default: 7777)",
+        ge=1,
+        le=65535,
+    )
+    expected_ip: Optional[str] = Field(
+        None,
+        description="Expected IP address to compare against resolved IP",
+    )
+
+    @field_validator("hostname")
+    @classmethod
+    def validate_hostname(cls, v: str) -> str:
+        v = v.strip()
+        if not _HOSTNAME_RE.match(v):
+            raise ValueError(f"Invalid hostname: {v!r}")
+        return v
+
+    @field_validator("expected_ip")
+    @classmethod
+    def validate_expected_ip(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        return _validate_ip_field(v)
+
+
+class ValidateHostnameResponse(BaseModel):
+    """Response from hostname DNS validation."""
+
+    resolvable: bool = Field(description="Whether the hostname could be resolved")
+    resolved_ip: Optional[str] = Field(
+        None, description="Resolved IP address (if successful)"
+    )
+    matches_expected: Optional[bool] = Field(
+        None,
+        description="Whether resolved IP matches expected_ip (null if no expected_ip)",
+    )
+    oct_reachable: bool = Field(
+        False,
+        description="Whether OCT is reachable at hostname:port",
+    )
+    error: Optional[str] = Field(
+        None, description="Error message (if resolution failed)"
+    )
+    oct_error: Optional[str] = Field(
+        None, description="Error message (if OCT check failed)"
+    )

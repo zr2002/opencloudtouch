@@ -13,6 +13,8 @@ import {
   getServerInfo,
   detectStrategy,
   DetectStrategyResponse,
+  validateHostname,
+  ValidateHostnameResponse,
 } from "../../api/wizard";
 import WizardStep from "./WizardStep";
 import "./Step5ConfigModification.css";
@@ -69,6 +71,9 @@ export default function Step5ConfigModification({
   const [showDiff, setShowDiff] = useState(false);
   const [strategy, setStrategy] = useState<DetectStrategyResponse | null>(null);
   const [detecting, setDetecting] = useState(true);
+  const [dnsWarning, setDnsWarning] = useState<ValidateHostnameResponse | null>(null);
+  const [serverIp, setServerIp] = useState<string | null>(null);
+  const [bypassDnsCheck, setBypassDnsCheck] = useState(false);
 
   // Auto-detect strategy and fill server URL on mount
   useEffect(() => {
@@ -77,6 +82,7 @@ export default function Step5ConfigModification({
       try {
         const [info, detected] = await Promise.all([getServerInfo(), detectStrategy()]);
         setCustomUrl(info.server_url);
+        setServerIp(info.server_ip);
         setStrategy(detected);
         onStrategyDetected?.(detected);
       } catch {
@@ -96,12 +102,133 @@ export default function Step5ConfigModification({
 
   const handleInputChange = (value: string) => {
     setCustomUrl(value);
-    setValidationError(""); // Clear validation error on change
+    setValidationError("");
+    setDnsWarning(null);
+    setBypassDnsCheck(false); // Reset bypass when user changes URL
   };
 
-  const handleModifyConfig = async () => {
+  /** Extract host (hostname or IP) from URL string (strip protocol and port). */
+  const extractHost = (url: string): string | null => {
+    const regex = /^(?:https?:\/\/)?([a-zA-Z0-9][a-zA-Z0-9.-]*|[\d.]+)(?::\d+)?$/;
+    const match = regex.exec(url.trim());
+    if (!match?.[1]) return null;
+    return match[1];
+  };
+
+  /** Check if a host string is an IP address (not a hostname). */
+  const isIpAddress = (host: string): boolean => {
+    return /^\d+\.\d+\.\d+\.\d+$/.test(host);
+  };
+
+  /** Extract port from URL string (default: 7777). */
+  const extractPort = (url: string): number => {
+    const regex = /^(?:https?:\/\/)?[a-zA-Z0-9][a-zA-Z0-9.-]*:(\d+)$/;
+    const match = regex.exec(url.trim());
+    return match?.[1] ? Number.parseInt(match[1], 10) : 7777;
+  };
+
+  /** Normalize URL to show what will actually be written (add protocol and port if missing). */
+  const normalizeUrl = (url: string): string => {
+    const trimmed = url.trim();
+    if (!trimmed) return "http://..."; // NOSONAR - placeholder only, not a real URL
+
+    // Pattern: (protocol)?(hostname|ip)(:port)?
+    const regex =
+      /^(?:(?<protocol>https?):\/\/)?(?<host>[a-zA-Z0-9][a-zA-Z0-9.-]*|[\d.]+)(?::(?<port>\d+))?$/;
+    const match = regex.exec(trimmed);
+
+    if (!match?.groups) return trimmed; // Invalid format - show as-is
+
+    const protocol = match.groups.protocol || "http";
+    const host = match.groups.host;
+    const port = match.groups.port || "7777";
+
+    return `${protocol}://${host}:${port}`;
+  };
+
+  /**
+   * Perform reachability validation for hostname or IP input.
+   * For hostnames: validates DNS resolution and OCT reachability.
+   * For IPs: validates only OCT reachability (no DNS check needed).
+   * Returns true if validation passed or was bypassed, false if validation failed.
+   */
+  const performReachabilityCheck = async (
+    targetUrl: string,
+    shouldBypassDns: boolean
+  ): Promise<boolean> => {
+    const host = extractHost(targetUrl);
+    if (!host || shouldBypassDns) {
+      return true; // Skip validation if no host extracted or when bypassed
+    }
+
+    try {
+      const port = extractPort(targetUrl);
+      const isIp = isIpAddress(host);
+
+      const result = await validateHostname({
+        hostname: host, // Backend accepts both hostnames and IPs
+        port,
+        expected_ip: isIp ? null : serverIp, // Only check IP match for hostnames
+      });
+
+      // For hostnames: check DNS resolution and IP match
+      if (!isIp && (!result.resolvable || result.matches_expected === false)) {
+        setDnsWarning(result);
+        return false;
+      }
+
+      // For both hostnames and IPs: check OCT reachability
+      if (!result.oct_reachable) {
+        setDnsWarning(result);
+        return false;
+      }
+
+      return true;
+    } catch {
+      // Validation failed — show warning
+      setDnsWarning({
+        resolvable: false,
+        resolved_ip: null,
+        matches_expected: null,
+        oct_reachable: false,
+        error: t("setup.wizard.step5.dnsCheckFailed"),
+        oct_error: null,
+      });
+      return false;
+    }
+  };
+
+  /**
+   * Parse backend validation error from API response.
+   * Extracts field-specific error messages from 422 validation responses.
+   */
+  const parseBackendError = (message: string): { isValidation: boolean; error: string } => {
+    if (!message.includes("422") && !message.includes("validation")) {
+      return { isValidation: false, error: message };
+    }
+
+    try {
+      const errorData = JSON.parse(message.split("failed: ")[1] || "{}");
+      if (errorData.errors?.[0]) {
+        return { isValidation: true, error: errorData.errors[0].message || message };
+      }
+    } catch {
+      // JSON parse failed, return original message
+    }
+
+    return { isValidation: false, error: message };
+  };
+
+  /**
+   * Handle config modification API call.
+   * Validates input, checks reachability, and submits to backend.
+   */
+  const handleModifyConfig = async (options?: { bypassDns?: boolean }) => {
+    const targetUrl = customUrl;
+    const shouldBypassDns = options?.bypassDns ?? bypassDnsCheck;
+
     // Validate input
-    const validation = validateTargetAddr(customUrl, t);
+    const validation = validateTargetAddr(targetUrl, t);
     if (!validation.valid) {
       setValidationError(validation.error || t("errors.badRequest"));
       return;
@@ -111,38 +238,34 @@ export default function Step5ConfigModification({
     setError("");
     setValidationError("");
 
+    // Reachability validation for hostnames and IPs
+    const reachable = await performReachabilityCheck(targetUrl, shouldBypassDns);
+    if (!reachable) {
+      setModifying(false);
+      return;
+    }
+
     try {
       const result = await modifyConfig({
         device_ip: deviceIp,
-        target_addr: customUrl, // Backend normalizes this
+        target_addr: targetUrl, // Backend normalizes this
       });
 
       setModifyData(result);
       onConfigModified(result);
+      setBypassDnsCheck(false); // Reset bypass after successful submit
 
       if (!result.success) {
         setError(result.message || t("setup.wizard.step5.errorTitle"));
       }
     } catch (err) {
-      let message = t("errors.unknown");
-      if (err instanceof Error) {
-        message = err.message;
-      }
-      // Parse validation errors from backend
-      if (message.includes("422") || message.includes("validation")) {
-        try {
-          const errorData = JSON.parse(message.split("failed: ")[1] || "{}");
-          if (errorData.errors && errorData.errors.length > 0) {
-            const fieldError = errorData.errors[0];
-            setValidationError(fieldError.message || message);
-          } else {
-            setError(message);
-          }
-        } catch {
-          setError(message);
-        }
+      const message = err instanceof Error ? err.message : t("errors.unknown");
+      const { isValidation, error } = parseBackendError(message);
+
+      if (isValidation) {
+        setValidationError(error);
       } else {
-        setError(message);
+        setError(error);
       }
     } finally {
       setModifying(false);
@@ -242,7 +365,49 @@ export default function Step5ConfigModification({
                 </div>
               </div>
             )}
-
+            {/* Reachability Warning (DNS or OCT) */}
+            {dnsWarning && (
+              <div className="config-dns-warning" data-test="dns-warning">
+                <div className="warning-icon">⚠️</div>
+                <div className="warning-content">
+                  <strong>
+                    {dnsWarning.oct_reachable
+                      ? t("setup.wizard.step5.dnsWarningTitle")
+                      : t("setup.wizard.step5.octUnreachableTitle")}
+                  </strong>
+                  {/* DNS resolution failed (hostnames only) */}
+                  {!dnsWarning.resolvable && (
+                    <p>{dnsWarning.error || t("setup.wizard.step5.dnsUnresolvable")}</p>
+                  )}
+                  {/* DNS resolved but IP mismatch (hostnames only) */}
+                  {dnsWarning.resolvable && dnsWarning.matches_expected === false && (
+                    <p>
+                      {t("setup.wizard.step5.dnsMismatch", {
+                        resolved: dnsWarning.resolved_ip,
+                        expected: serverIp,
+                      })}
+                    </p>
+                  )}
+                  {/* OCT not reachable (hostnames and IPs) */}
+                  {!dnsWarning.oct_reachable && dnsWarning.oct_error && (
+                    <p>{dnsWarning.oct_error}</p>
+                  )}
+                  <div className="dns-warning-actions">
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setDnsWarning(null);
+                        setBypassDnsCheck(true);
+                        handleModifyConfig({ bypassDns: true });
+                      }}
+                      data-test="dns-proceed"
+                    >
+                      {t("setup.wizard.step5.dnsProceed")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="config-change-preview">
               <h4 className="config-preview-title">{t("setup.wizard.step5.changePreviewTitle")}</h4>
               <div className="config-change-item">
@@ -253,14 +418,14 @@ export default function Step5ConfigModification({
                 <div className="config-change-arrow">→</div>
                 <div className="config-change-to">
                   <span className="config-change-label">{t("setup.wizard.step5.changeTo")}</span>
-                  <code>{customUrl || "http://..."}</code>
+                  <code>{normalizeUrl(customUrl)}</code>
                 </div>
               </div>
             </div>
 
             <button
               className="btn btn-primary config-modify-btn"
-              onClick={handleModifyConfig}
+              onClick={() => handleModifyConfig()}
               disabled={modifying || !customUrl}
             >
               {modifying ? (
@@ -300,7 +465,7 @@ export default function Step5ConfigModification({
               </div>
               <div className="config-detail-item">
                 <strong>{t("setup.wizard.step5.newUrl")}</strong>
-                <code>{modifyData.new_url || customUrl}</code>
+                <code>{normalizeUrl(modifyData.new_url || customUrl)}</code>
               </div>
               {modifyData.backup_path && (
                 <div className="config-detail-item">

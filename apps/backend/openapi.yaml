@@ -2540,6 +2540,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/setup/wizard/validate-hostname:
+    post:
+      tags:
+      - Setup Wizard
+      summary: Wizard Validate Hostname
+      description: Validate a hostname via DNS resolution.
+      operationId: wizard_validate_hostname_api_setup_wizard_validate_hostname_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateHostnameRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateHostnameResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/setup/wizard/verify-redirect:
     post:
       tags:
@@ -4501,6 +4527,73 @@ components:
       - msg
       - type
       title: ValidationError
+    ValidateHostnameRequest:
+      properties:
+        hostname:
+          type: string
+          minLength: 1
+          maxLength: 255
+          title: Hostname
+          description: Hostname to resolve (e.g. 'hera' or 'myserver.local')
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          default: 7777
+          title: Port
+          description: "Port to check for OCT reachability (default: 7777)"
+        expected_ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Expected Ip
+          description: Expected IP address to compare against resolved IP
+      type: object
+      required:
+      - hostname
+      title: ValidateHostnameRequest
+      description: Request to validate a hostname via DNS resolution.
+    ValidateHostnameResponse:
+      properties:
+        resolvable:
+          type: boolean
+          title: Resolvable
+          description: Whether the hostname could be resolved
+        resolved_ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolved Ip
+          description: Resolved IP address (if successful)
+        matches_expected:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Matches Expected
+          description: Whether resolved IP matches expected_ip (null if no expected_ip)
+        oct_reachable:
+          type: boolean
+          default: false
+          title: Oct Reachable
+          description: Whether OCT is reachable at hostname:port
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+          description: Error message (if resolution failed)
+        oct_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Oct Error
+          description: Error message (if OCT check failed)
+      type: object
+      required:
+      - resolvable
+      - oct_reachable
+      title: ValidateHostnameResponse
+      description: Response from hostname DNS validation.
     VerifyCheck:
       properties:
         name:
