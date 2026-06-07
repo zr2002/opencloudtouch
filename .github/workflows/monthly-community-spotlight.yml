@@ -190,11 +190,12 @@ jobs:
             (.[0] // []) as $issueComments |
             (.[1] // []) as $issuesCreated |
             (.[2] // []) as $prsCreated |
-            (.[3] // []) as $discussionComments |
-            (.[4] // []) as $lifetimeIssueComments |
-            (.[5] // []) as $lifetimeIssues |
-            (.[6] // []) as $lifetimePRs |
-            (.[7] // []) as $lifetimeDiscussions |
+            (.[3] // []) as $prReviews |
+            (.[4] // []) as $discussionComments |
+            (.[5] // []) as $lifetimeIssueComments |
+            (.[6] // []) as $lifetimeIssues |
+            (.[7] // []) as $lifetimePRs |
+            (.[8] // []) as $lifetimeDiscussions |
             
             # Calculate lifetime totals per user
             ([$lifetimeIssueComments[], $lifetimeIssues[], $lifetimePRs[], $lifetimeDiscussions[]] |
@@ -231,7 +232,7 @@ jobs:
             
             # Build combined map for recent activity
             # Collect all unique authors from all sources
-            ([$issueComments[], $issuesCreated[], $prsCreated[], $discussionComments[]] | 
+            ([$issueComments[], $issuesCreated[], $prsCreated[], $prReviews[], $discussionComments[]] | 
              map(select(.author) | .author) | 
              unique |
              map(. as $author | {
@@ -277,7 +278,7 @@ jobs:
              reverse |
              .[0:5]
             )
-          ' <(echo "$ISSUE_COMMENTS") <(echo "$ISSUES_CREATED") <(echo "$PRS_CREATED") <(echo "$DISCUSSION_COMMENTS") <(echo "$LIFETIME_ISSUE_COMMENTS") <(echo "$LIFETIME_ISSUES") <(echo "$LIFETIME_PRS") <(echo "$LIFETIME_DISCUSSIONS"))
+          ' <(echo "$ISSUE_COMMENTS") <(echo "$ISSUES_CREATED") <(echo "$PRS_CREATED") <(echo "$PR_REVIEWS") <(echo "$DISCUSSION_COMMENTS") <(echo "$LIFETIME_ISSUE_COMMENTS") <(echo "$LIFETIME_ISSUES") <(echo "$LIFETIME_PRS") <(echo "$LIFETIME_DISCUSSIONS"))
 
           echo "contributors<<EOF" >> $GITHUB_OUTPUT
           echo "$CONTRIBUTORS_JSON" >> $GITHUB_OUTPUT
