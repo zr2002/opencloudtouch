@@ -312,8 +312,8 @@ jobs:
                 (if .prsMerged > 0 then " (**\(.prsMerged) merged** ✅)" else "" end) + 
                 " — lifetime: **\(.lifetimePRs)** total\n" else "" end) +
               (if .prReviews > 0 then "- 👀 **\(.prReviews) PR review(s)** — helping improve code quality\n" else "" end) +
-              (if .issueCommentCount > 0 then "- 💬 **\(.issueCommentCount) comment(s)** on issues (\(.issueCommentWords) words) — lifetime: **\(.lifetimeComments)** total\n" else "" end) +
-              (if .discussionCommentCount > 0 then "- 💡 **\(.discussionCommentCount) discussion comment(s)** (\(.discussionCommentWords) words) — lifetime: **\(.lifetimeDiscussions)** total\n" else "" end) +
+              (if .issueCommentCount > 0 then "- 💬 **\(.issueCommentCount) comment(s)** on issues — lifetime: **\(.lifetimeComments)** total\n" else "" end) +
+              (if .discussionCommentCount > 0 then "- 💡 **\(.discussionCommentCount) discussion comment(s)** — lifetime: **\(.lifetimeDiscussions)** total\n" else "" end) +
               "\n**Impact:** " + (
                 # Determine impact based on actual contributions
                 if .prsMerged > 0 and .bugReports > 0 then "Code contributor and bug hunter — directly improving the codebase!"
