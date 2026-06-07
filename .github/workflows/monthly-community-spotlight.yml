@@ -1,6 +1,5 @@
 name: Monthly Community Spotlight Announcement
 
-# Test PR for PR review tracking verification
 on:
   schedule:
     # Runs on the 1st of every month at 06:00 UTC
@@ -381,7 +380,7 @@ jobs:
                 }
               }
             }
-          ' -f owner=${{ github.repository_owner }} -f repo=${{ github.event.repository.name }} --jq '.data.repository.discussionCategories.nodes[] | select(.name == "Test") | .id')
+          ' -f owner=${{ github.repository_owner }} -f repo=${{ github.event.repository.name }} --jq '.data.repository.discussionCategories.nodes[] | select(.name == "Announcements") | .id')
           
           echo "Repository ID: $REPO_ID"
           echo "Category ID: $CATEGORY_ID"
