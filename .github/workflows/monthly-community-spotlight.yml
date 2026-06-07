@@ -107,7 +107,7 @@ jobs:
              }) |
              sort_by(.score) |
              reverse |
-             .[0:10]
+             .[0:5]
             )
           ' <(echo "$ISSUE_COMMENTS") <(echo "$ISSUES_CREATED") <(echo "$DISCUSSION_COMMENTS"))
 
