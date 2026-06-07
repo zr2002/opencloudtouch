@@ -380,7 +380,7 @@ jobs:
                 }
               }
             }
-          ' -f owner=${{ github.repository_owner }} -f repo=${{ github.event.repository.name }} --jq '.data.repository.discussionCategories.nodes[] | select(.name == "Announcements") | .id')
+          ' -f owner=${{ github.repository_owner }} -f repo=${{ github.event.repository.name }} --jq '.data.repository.discussionCategories.nodes[] | select(.name == "Test") | .id')
           
           echo "Repository ID: $REPO_ID"
           echo "Category ID: $CATEGORY_ID"
