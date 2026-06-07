@@ -33,7 +33,7 @@ jobs:
           # Collect issue comments
           echo "📊 Collecting issue comments..."
           ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?since=${SINCE}T00:00:00Z&per_page=100" --paginate --jq '
-            [.[] | select(.user.type != "Bot") | .user.login] | 
+            [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] | 
             group_by(.) | 
             map({author: .[0], count: length}) | 
             sort_by(.count) | 
@@ -55,7 +55,7 @@ jobs:
               }
             }
           ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" -f since="${SINCE}T00:00:00Z" --jq '
-            [.data.repository.issues.nodes[] | select(.author.login) | {author: .author.login, issue: .number}] |
+            [.data.repository.issues.nodes[] | select(.author.login and .author.login != "scheilch" and .author.login != "oct-support") | {author: .author.login, issue: .number}] |
             group_by(.author) |
             map({author: .[0].author, issues: map(.issue)})
           ')
@@ -79,7 +79,7 @@ jobs:
             }
           ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq "
             [.data.repository.discussions.nodes[].comments.nodes[] | 
-             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null) | 
+             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and .author.login != \"scheilch\" and .author.login != \"oct-support\") | 
              .author.login] |
             group_by(.) |
             map({author: .[0], count: length})
