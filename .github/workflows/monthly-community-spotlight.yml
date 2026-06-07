@@ -31,10 +31,13 @@ jobs:
           SINCE=$(date -d '30 days ago' +'%Y-%m-%d' 2>/dev/null || date -v-30d +'%Y-%m-%d')
           echo "Analyzing activity since $SINCE..."
 
+          # Excluded logins (maintainers + service accounts) — single source of truth
+          EXCLUDE_LOGINS='["scheilch","oct-support","codecov-commenter"]'
+
           # Collect issue comments with body text (last 30 days)
           echo "📊 Collecting issue comments (last 30 days)..."
-          ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?since=${SINCE}T00:00:00Z&per_page=100" --paginate --jq '
-            [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | 
+          ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?since=${SINCE}T00:00:00Z&per_page=100" --paginate | jq -s --argjson exclude "$EXCLUDE_LOGINS" '
+            [.[][] | select(.user.type != "Bot" and (.user.login | IN($exclude[]) | not)) | 
              {author: .user.login, body: .body}]
           ')
 
@@ -55,8 +58,8 @@ jobs:
                 }
               }
             }
-          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" -f since="${SINCE}T00:00:00Z" --jq '
-            [.data.repository.issues.nodes[] | select(.author.login and .author.login != "scheilch" and .author.login != "oct-support") | 
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" -f since="${SINCE}T00:00:00Z" | jq --argjson exclude "$EXCLUDE_LOGINS" '
+            [.data.repository.issues.nodes[] | select(.author.login and (.author.login | IN($exclude[]) | not)) | 
              {author: .author.login, issue: .number, labels: [.labels.nodes[].name]}] |
             group_by(.author) |
             map({
@@ -82,9 +85,9 @@ jobs:
                 }
               }
             }
-          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq "
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" | jq --argjson exclude "$EXCLUDE_LOGINS" "
             [.data.repository.pullRequests.nodes[] | 
-             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and .author.login != \"scheilch\" and .author.login != \"oct-support\") |
+             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and (.author.login | IN(\$exclude[]) | not)) |
              {author: .author.login, pr: .number, state: .state}] |
             group_by(.author) |
             map({author: .[0].author, prs: map(.pr), merged: [.[] | select(.state == \"MERGED\")] | length})
@@ -107,9 +110,9 @@ jobs:
                 }
               }
             }
-          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq "
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" | jq --argjson exclude "$EXCLUDE_LOGINS" "
             [.data.repository.pullRequests.nodes[].reviews.nodes[] |
-             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and .author.login != \"scheilch\" and .author.login != \"oct-support\") |
+             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and (.author.login | IN(\$exclude[]) | not)) |
              .author.login] |
             group_by(.) |
             map({author: .[0], count: length})
@@ -133,9 +136,9 @@ jobs:
                 }
               }
             }
-          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq "
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" | jq --argjson exclude "$EXCLUDE_LOGINS" "
             [.data.repository.discussions.nodes[].comments.nodes[] | 
-             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and .author.login != \"scheilch\" and .author.login != \"oct-support\") | 
+             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and (.author.login | IN(\$exclude[]) | not)) | 
              {author: .author.login, body: .body}]
           ")
 
@@ -143,22 +146,22 @@ jobs:
           echo "📊 Collecting lifetime statistics..."
           
           # All-time issue comments
-          LIFETIME_ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?per_page=100" --paginate | jq -s '
-            [.[][] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] |
+          LIFETIME_ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?per_page=100" --paginate | jq -s --argjson exclude "$EXCLUDE_LOGINS" '
+            [.[][] | select(.user.type != "Bot" and (.user.login | IN($exclude[]) | not)) | .user.login] |
             group_by(.) |
             map({author: .[0], total: length})
           ')
           
           # All-time issues created
-          LIFETIME_ISSUES=$(gh api "/repos/${{ github.repository }}/issues?state=all&per_page=100" --paginate | jq -s '
-            [.[][] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support" and .pull_request == null) | .user.login] |
+          LIFETIME_ISSUES=$(gh api "/repos/${{ github.repository }}/issues?state=all&per_page=100" --paginate | jq -s --argjson exclude "$EXCLUDE_LOGINS" '
+            [.[][] | select(.user.type != "Bot" and (.user.login | IN($exclude[]) | not) and .pull_request == null) | .user.login] |
             group_by(.) |
             map({author: .[0], total: length})
           ')
           
           # All-time PRs
-          LIFETIME_PRS=$(gh api "/repos/${{ github.repository }}/pulls?state=all&per_page=100" --paginate | jq -s '
-            [.[][] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] |
+          LIFETIME_PRS=$(gh api "/repos/${{ github.repository }}/pulls?state=all&per_page=100" --paginate | jq -s --argjson exclude "$EXCLUDE_LOGINS" '
+            [.[][] | select(.user.type != "Bot" and (.user.login | IN($exclude[]) | not)) | .user.login] |
             group_by(.) |
             map({author: .[0], total: length})
           ')
@@ -178,8 +181,8 @@ jobs:
                 }
               }
             }
-          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq '
-            [.data.repository.discussions.nodes[].comments.nodes[] | select(.author.login and .author.login != "scheilch" and .author.login != "oct-support") | .author.login] |
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" | jq --argjson exclude "$EXCLUDE_LOGINS" '
+            [.data.repository.discussions.nodes[].comments.nodes[] | select(.author.login and (.author.login | IN($exclude[]) | not)) | .author.login] |
             group_by(.) |
             map({author: .[0], total: length})
           ')
