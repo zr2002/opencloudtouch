@@ -85,7 +85,7 @@ on:
       BUILD_SIGNING_KEY:
         required: true
       SUPPORTERS_API_PASS:
-        required: false
+        required: true
 
 env:
   REGISTRY: ghcr.io
