@@ -143,22 +143,22 @@ jobs:
           echo "📊 Collecting lifetime statistics..."
           
           # All-time issue comments
-          LIFETIME_ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?per_page=100" --paginate --jq '
-            [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] |
+          LIFETIME_ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?per_page=100" --paginate | jq -s '
+            [.[][] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] |
             group_by(.) |
             map({author: .[0], total: length})
           ')
           
           # All-time issues created
-          LIFETIME_ISSUES=$(gh api "/repos/${{ github.repository }}/issues?state=all&per_page=100" --paginate --jq '
-            [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support" and .pull_request == null) | .user.login] |
+          LIFETIME_ISSUES=$(gh api "/repos/${{ github.repository }}/issues?state=all&per_page=100" --paginate | jq -s '
+            [.[][] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support" and .pull_request == null) | .user.login] |
             group_by(.) |
             map({author: .[0], total: length})
           ')
           
           # All-time PRs
-          LIFETIME_PRS=$(gh api "/repos/${{ github.repository }}/pulls?state=all&per_page=100" --paginate --jq '
-            [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] |
+          LIFETIME_PRS=$(gh api "/repos/${{ github.repository }}/pulls?state=all&per_page=100" --paginate | jq -s '
+            [.[][] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] |
             group_by(.) |
             map({author: .[0], total: length})
           ')
