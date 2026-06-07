@@ -103,7 +103,7 @@ jobs:
                discussionComments: ([.[] | select(.count) | .count] | add // 0)
              }) |
              map(. + {
-               score: (.issuesCreated * 10) + (.issueComments * 2) + (.discussionComments * 1)
+               score: ((.issuesCreated * 10) + (.issueComments * 2) + .discussionComments)
              }) |
              sort_by(.score) |
              reverse |
