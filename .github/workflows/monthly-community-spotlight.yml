@@ -32,7 +32,7 @@ jobs:
           echo "Analyzing activity since $SINCE..."
 
           # Excluded logins (maintainers + service accounts) — single source of truth
-          EXCLUDE_LOGINS='["scheilch","oct-support","codecov-commenter"]'
+          EXCLUDE_LOGINS='["scheilch","oct-support","codecov-commenter","dependabot","github-code-quality"]'
 
           # Collect issue comments with body text (last 30 days)
           echo "📊 Collecting issue comments (last 30 days)..."
@@ -336,15 +336,12 @@ jobs:
             "\n---\n\n" +
             "## 📊 How We Select Contributors\n\n" +
             "This spotlight recognizes recent activity (last 30 days) combined with all-time contributions:\n\n" +
-            "- 🐛 **Bug Reports** — identifying issues (10 pts/issue)\n" +
-            "- ✨ **Feature Requests** — suggesting improvements (10 pts/issue)\n" +
-            "- 🔧 **Pull Requests** — submitting code (15 pts + 5 pts if merged)\n" +
-            "- 👀 **PR Reviews** — code review feedback (3 pts/review)\n" +
-            "- 💬 **Issue Comments** — quality over quantity! Score = log₂(1 + words/10)\n" +
-            "  - Short link (#123): ~1 point\n" +
-            "  - Helpful explanation (50 words): ~2.3 points\n" +
-            "  - Detailed answer (200 words): ~4.4 points\n" +
-            "- 💡 **Discussion Comments** — same formula, rewarding thoughtful contributions\n\n" +
+            "- 🐛 **Bug Reports** — identifying issues\n" +
+            "- ✨ **Feature Requests** — suggesting improvements\n" +
+            "- 🔧 **Pull Requests** — submitting code\n" +
+            "- 👀 **PR Reviews** — code review feedback\n" +
+            "- 💬 **Issue Comments** — quality over quantity! +
+            "- 💡 **Discussion Comments** — same principle, rewarding thoughtful contributions\n\n" +
             "**⭐ Star Ratings** are based on your **all-time contributions** compared to the entire community:\n" +
             "- ⭐⭐⭐⭐⭐ Top 3% of all contributors\n" +
             "- ⭐⭐⭐⭐ Top 10%\n" +
@@ -356,7 +353,7 @@ jobs:
             "## 💛 Support OpenCloudTouch\n\n" +
             "Want to help keep this project alive? Your support means the world to us!\n\n" +
             "☕ **[Buy Me a Coffee](https://buymeacoffee.com/b49rjg5k6vj)**\n\n" +
-            "Financial supporters are featured in the **Settings → About** section of the web interface!\n\n" +
+            "Financial supporters are featured in the **About** section of the web interface!\n\n" +
             "---\n\n" +
             "_Auto-generated monthly announcement • Next spotlight: " + ((now | gmtime | mktime + 2592000) | strftime("%B 1, %Y")) + "_"
           ')
