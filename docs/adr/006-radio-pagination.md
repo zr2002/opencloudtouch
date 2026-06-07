@@ -1,7 +1,7 @@
 # ADR-006: Radio Search Pagination ("Mehr laden")
 
 **Status:** Proposed  
-**Issue:** [#93 — RadioBrowser results differ from website results](https://github.com/scheilch/opencloudtouch/issues/93)  
+**Issue:** [#93 — RadioBrowser results differ from website results](https://github.com/opencloudtouch/opencloudtouch/issues/93)  
 **Branch:** `feat/radio-pagination`  
 **Date:** 2026-04-22
 
