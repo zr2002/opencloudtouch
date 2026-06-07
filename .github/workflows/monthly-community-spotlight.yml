@@ -30,8 +30,8 @@ jobs:
           SINCE=$(date -d '30 days ago' +'%Y-%m-%d' 2>/dev/null || date -v-30d +'%Y-%m-%d')
           echo "Analyzing activity since $SINCE..."
 
-          # Collect issue comments
-          echo "📊 Collecting issue comments..."
+          # Collect issue comments (last 30 days)
+          echo "📊 Collecting issue comments (last 30 days)..."
           ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?since=${SINCE}T00:00:00Z&per_page=100" --paginate --jq '
             [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] | 
             group_by(.) | 
@@ -40,8 +40,8 @@ jobs:
             reverse
           ')
 
-          # Collect issues created
-          echo "📊 Collecting issues created..."
+          # Collect issues created with labels (last 30 days)
+          echo "📊 Collecting issues created (last 30 days)..."
           ISSUES_CREATED=$(gh api graphql -f query='
             query($owner: String!, $repo: String!, $since: DateTime!) {
               repository(owner: $owner, name: $repo) {
@@ -50,18 +50,75 @@ jobs:
                     number
                     author { login }
                     createdAt
+                    labels(first: 10) {
+                      nodes { name }
+                    }
                   }
                 }
               }
             }
           ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" -f since="${SINCE}T00:00:00Z" --jq '
-            [.data.repository.issues.nodes[] | select(.author.login and .author.login != "scheilch" and .author.login != "oct-support") | {author: .author.login, issue: .number}] |
+            [.data.repository.issues.nodes[] | select(.author.login and .author.login != "scheilch" and .author.login != "oct-support") | 
+             {author: .author.login, issue: .number, labels: [.labels.nodes[].name]}] |
             group_by(.author) |
-            map({author: .[0].author, issues: map(.issue)})
+            map({
+              author: .[0].author, 
+              issues: map({number: .issue, labels: .labels}),
+              bugCount: [.[] | select(.labels | contains(["bug"]))] | length,
+              featureCount: [.[] | select(.labels | contains(["enhancement"]))] | length
+            })
           ')
 
-          # Collect discussion comments
-          echo "📊 Collecting discussion comments..."
+          # Collect PRs created (last 30 days)
+          echo "📊 Collecting PRs created (last 30 days)..."
+          PRS_CREATED=$(gh api graphql -f query='
+            query($owner: String!, $repo: String!, $since: DateTime!) {
+              repository(owner: $owner, name: $repo) {
+                pullRequests(first: 100, orderBy: {field: CREATED_AT, direction: DESC}, states: [OPEN, MERGED, CLOSED]) {
+                  nodes {
+                    number
+                    author { login }
+                    createdAt
+                    state
+                  }
+                }
+              }
+            }
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" -f since="${SINCE}T00:00:00Z" --jq "
+            [.data.repository.pullRequests.nodes[] | 
+             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and .author.login != \"scheilch\" and .author.login != \"oct-support\") |
+             {author: .author.login, pr: .number, state: .state}] |
+            group_by(.author) |
+            map({author: .[0].author, prs: map(.pr), merged: [.[] | select(.state == \"MERGED\")] | length})
+          ")
+
+          # Collect PR reviews (last 30 days)
+          echo "📊 Collecting PR reviews (last 30 days)..."
+          PR_REVIEWS=$(gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                pullRequests(first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
+                  nodes {
+                    reviews(first: 50) {
+                      nodes {
+                        author { login }
+                        createdAt
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq "
+            [.data.repository.pullRequests.nodes[].reviews.nodes[] |
+             select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and .author.login != \"scheilch\" and .author.login != \"oct-support\") |
+             .author.login] |
+            group_by(.) |
+            map({author: .[0], count: length})
+          ")
+
+          # Collect discussion comments (last 30 days)
+          echo "📊 Collecting discussion comments (last 30 days)..."
           DISCUSSION_COMMENTS=$(gh api graphql -f query='
             query($owner: String!, $repo: String!) {
               repository(owner: $owner, name: $repo) {
@@ -85,38 +142,160 @@ jobs:
             map({author: .[0], count: length})
           ")
 
+          # Collect LIFETIME statistics for all contributors
+          echo "📊 Collecting lifetime statistics..."
+          
+          # All-time issue comments
+          LIFETIME_ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?per_page=100" --paginate --jq '
+            [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] |
+            group_by(.) |
+            map({author: .[0], total: length})
+          ')
+          
+          # All-time issues created
+          LIFETIME_ISSUES=$(gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                issues(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes {
+                    author { login }
+                  }
+                }
+              }
+            }
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq '
+            [.data.repository.issues.nodes[] | select(.author.login and .author.login != "scheilch" and .author.login != "oct-support") | .author.login] |
+            group_by(.) |
+            map({author: .[0], total: length})
+          ')
+          
+          # All-time PRs
+          LIFETIME_PRS=$(gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                pullRequests(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes {
+                    author { login }
+                  }
+                }
+              }
+            }
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq '
+            [.data.repository.pullRequests.nodes[] | select(.author.login and .author.login != "scheilch" and .author.login != "oct-support") | .author.login] |
+            group_by(.) |
+            map({author: .[0], total: length})
+          ')
+          
+          # All-time discussion comments
+          LIFETIME_DISCUSSIONS=$(gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                discussions(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes {
+                    comments(first: 100) {
+                      nodes {
+                        author { login }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq '
+            [.data.repository.discussions.nodes[].comments.nodes[] | select(.author.login and .author.login != "scheilch" and .author.login != "oct-support") | .author.login] |
+            group_by(.) |
+            map({author: .[0], total: length})
+          ')
+
           # Combine and score contributors
-          echo "📊 Calculating scores..."
-          TOP_CONTRIBUTORS=$(jq -s '
+          echo "📊 Calculating scores and star ratings..."
+          CONTRIBUTORS_JSON=$(jq -s '
             (.[0] // []) as $issueComments |
             (.[1] // []) as $issuesCreated |
-            (.[2] // []) as $discussionComments |
+            (.[2] // []) as $prsCreated |
+            (.[3] // []) as $prReviews |
+            (.[4] // []) as $discussionComments |
+            (.[5] // []) as $lifetimeIssueComments |
+            (.[6] // []) as $lifetimeIssues |
+            (.[7] // []) as $lifetimePRs |
+            (.[8] // []) as $lifetimeDiscussions |
             
-            # Build combined map
-            ([$issueComments[], $issuesCreated[], $discussionComments[]] | 
+            # Calculate lifetime totals per user
+            ([$lifetimeIssueComments[], $lifetimeIssues[], $lifetimePRs[], $lifetimeDiscussions[]] |
+             map(select(.author)) |
+             group_by(.author) |
+             map({
+               author: .[0].author,
+               lifetimeTotal: ([.[] | .total] | add // 0)
+             })
+            ) as $lifetimeTotals |
+            
+            # Sort users by lifetime total contributions and assign percentile-based stars
+            ($lifetimeTotals | 
+             sort_by(.lifetimeTotal) | 
+             reverse |
+             to_entries |
+             map({
+               author: .value.author,
+               lifetimeTotal: .value.lifetimeTotal,
+               rank: (.key + 1),
+               totalUsers: ($lifetimeTotals | length),
+               percentile: (((.key + 1) / ($lifetimeTotals | length)) * 100),
+               stars: (
+                 if (((.key + 1) / ($lifetimeTotals | length)) * 100) <= 3 then 5
+                 elif (((.key + 1) / ($lifetimeTotals | length)) * 100) <= 10 then 4
+                 elif (((.key + 1) / ($lifetimeTotals | length)) * 100) <= 25 then 3
+                 elif (((.key + 1) / ($lifetimeTotals | length)) * 100) <= 50 then 2
+                 elif (((.key + 1) / ($lifetimeTotals | length)) * 100) <= 75 then 1
+                 else 0
+                 end
+               )
+             })
+            ) as $starRatings |
+            
+            # Build combined map for recent activity
+            ([$issueComments[], $issuesCreated[], $prsCreated[], $prReviews[], $discussionComments[]] | 
              map(select(.author)) |
              group_by(.author) |
              map({
                author: .[0].author,
                issueComments: ([.[] | select(.count) | .count] | add // 0),
                issuesCreated: ([.[] | select(.issues) | .issues | length] | add // 0),
+               bugReports: ([.[] | select(.bugCount) | .bugCount] | add // 0),
+               featureRequests: ([.[] | select(.featureCount) | .featureCount] | add // 0),
+               prsCreated: ([.[] | select(.prs) | .prs | length] | add // 0),
+               prsMerged: ([.[] | select(.merged) | .merged] | add // 0),
+               prReviews: ([.[] | select(.count) | .count] | add // 0),
                discussionComments: ([.[] | select(.count) | .count] | add // 0)
              }) |
+             # Add lifetime stats and stars
+             map(. as $user | 
+               ($lifetimeTotals | map(select(.author == $user.author)) | .[0] // {lifetimeTotal: 0}) as $lifetime |
+               ($starRatings | map(select(.author == $user.author)) | .[0] // {stars: 0}) as $rating |
+               $user + {
+                 lifetimeIssues: ([$lifetimeIssues[] | select(.author == $user.author) | .total] | add // 0),
+                 lifetimeComments: ([$lifetimeIssueComments[] | select(.author == $user.author) | .total] | add // 0),
+                 lifetimePRs: ([$lifetimePRs[] | select(.author == $user.author) | .total] | add // 0),
+                 lifetimeDiscussions: ([$lifetimeDiscussions[] | select(.author == $user.author) | .total] | add // 0),
+                 lifetimeTotal: $lifetime.lifetimeTotal,
+                 stars: $rating.stars
+               }
+             ) |
              map(. + {
-               score: ((.issuesCreated * 10) + (.issueComments * 2) + .discussionComments)
+               score: ((.issuesCreated * 10) + (.prsCreated * 15) + (.prsMerged * 5) + (.prReviews * 3) + (.issueComments * 2) + .discussionComments)
              }) |
              sort_by(.score) |
              reverse |
              .[0:5]
             )
-          ' <(echo "$ISSUE_COMMENTS") <(echo "$ISSUES_CREATED") <(echo "$DISCUSSION_COMMENTS"))
+          ' <(echo "$ISSUE_COMMENTS") <(echo "$ISSUES_CREATED") <(echo "$PRS_CREATED") <(echo "$PR_REVIEWS") <(echo "$DISCUSSION_COMMENTS") <(echo "$LIFETIME_ISSUE_COMMENTS") <(echo "$LIFETIME_ISSUES") <(echo "$LIFETIME_PRS") <(echo "$LIFETIME_DISCUSSIONS"))
 
           echo "contributors<<EOF" >> $GITHUB_OUTPUT
-          echo "$TOP_CONTRIBUTORS" >> $GITHUB_OUTPUT
+          echo "$CONTRIBUTORS_JSON" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          echo "✅ Top contributors:"
-          echo "$TOP_CONTRIBUTORS" | jq -r '.[] | "  \(.author) (Score: \(.score))"'
+          echo "✅ Top contributors (with ⭐ ratings):"
+          echo "$CONTRIBUTORS_JSON" | jq -r '.[] | "  \(.author) \(["", "⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐"][.stars]) (Score: \(.score), Lifetime: \(.lifetimeTotal))"'
 
       - name: Generate Discussion Body
         id: discussion
@@ -127,33 +306,63 @@ jobs:
           # Generate markdown for discussion post
           BODY=$(echo "$CONTRIBUTORS" | jq -r --arg month "$MONTH" '
             "# 🌟 Community Spotlight — " + $month + "\n\n" +
-            "Thank you to our most active community members from the past month! Your contributions help make OpenCloudTouch better for everyone.\n\n" +
-            "## 🏆 Top Contributors\n\n" +
+            "## 💙 A Heartfelt Thank You!\n\n" +
+            "This month, we want to shine a light on the incredible people who make **OpenCloudTouch** better every single day. Whether you reported a bug, answered a question, submitted a PR, or shared your knowledge — **you are the reason this project thrives**. Thank you for being part of this journey! 🙏\n\n" +
+            "---\n\n" +
+            "## 🏆 Top Contributors This Month\n\n" +
             (map(
-              "### [@\(.author)](https://github.com/\(.author))\n\n" +
-              "- **Activity:** \(.issuesCreated) issue(s), \(.issueComments + .discussionComments) comment(s)\n" +
-              "- **Impact:** " + (
-                if .issuesCreated > 0 and .issueComments > 10 then "Active bug reporting and community support"
-                elif .issuesCreated > 0 then "Bug reporting and feature suggestions"
-                elif .issueComments > 10 then "Active community support and debugging help"
-                else "Community engagement"
+              "### [@\(.author)](https://github.com/\(.author)) " + (["", "⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐"][.stars]) + "\n\n" +
+              "**Recent Activity (last 30 days):**\n" +
+              (if .issuesCreated > 0 then "- 🐛 **\(.issuesCreated) issue(s)** created (" + 
+                (if .bugReports > 0 then "\(.bugReports) bug report" + (if .bugReports > 1 then "s" else "" end) else "" end) +
+                (if .bugReports > 0 and .featureRequests > 0 then ", " else "" end) +
+                (if .featureRequests > 0 then "\(.featureRequests) feature request" + (if .featureRequests > 1 then "s" else "" end) else "" end) +
+                ") — lifetime: **\(.lifetimeIssues)** total\n" else "" end) +
+              (if .prsCreated > 0 then "- 🔧 **\(.prsCreated) pull request(s)** submitted" + 
+                (if .prsMerged > 0 then " (**\(.prsMerged) merged** ✅)" else "" end) + 
+                " — lifetime: **\(.lifetimePRs)** total\n" else "" end) +
+              (if .prReviews > 0 then "- 👀 **\(.prReviews) PR review(s)** — helping improve code quality\n" else "" end) +
+              (if .issueComments > 0 then "- 💬 **\(.issueComments) comment(s)** on issues — lifetime: **\(.lifetimeComments)** total\n" else "" end) +
+              (if .discussionComments > 0 then "- 💡 **\(.discussionComments) discussion comment(s)** — lifetime: **\(.lifetimeDiscussions)** total\n" else "" end) +
+              "\n**Impact:** " + (
+                # Determine impact based on actual contributions
+                if .prsMerged > 0 and .bugReports > 0 then "Code contributor and bug hunter — directly improving the codebase!"
+                elif .prsMerged > 0 then "Code contributor — thank you for your pull requests!"
+                elif .prsCreated > 0 then "Active contributor — your PRs are in review!"
+                elif .bugReports > 2 and .issueComments > 5 then "Bug detective and community helper — finding issues and supporting others"
+                elif .bugReports > 2 then "Bug reporter — helping us squash those pesky bugs"
+                elif .featureRequests > 2 then "Feature visionary — shaping the future of OpenCloudTouch"
+                elif .issueComments > 10 and .discussionComments > 5 then "Community champion — active support across issues and discussions"
+                elif .issueComments > 10 then "Support hero — always there to help others"
+                elif .discussionComments > 5 then "Knowledge sharer — enriching our community discussions"
+                elif .prReviews > 3 then "Code reviewer — ensuring quality through thorough reviews"
+                else "Active community member — every contribution counts!"
                 end
               ) + "\n"
             ) | join("\n")) +
             "\n---\n\n" +
             "## 📊 How We Select Contributors\n\n" +
-            "This spotlight recognizes members by:\n\n" +
-            "- 🐛 **Issues created** — identifying bugs and suggesting features\n" +
-            "- 💬 **Comments** — helping others, debugging, providing solutions\n" +
-            "- 💡 **Discussions** — sharing knowledge and best practices\n\n" +
-            "**Note:** This is an automated selection based on activity volume. Quality always matters more than quantity!\n\n" +
+            "This spotlight recognizes recent activity (last 30 days) combined with all-time contributions:\n\n" +
+            "- 🐛 **Bug Reports** — identifying issues (10 pts/issue)\n" +
+            "- ✨ **Feature Requests** — suggesting improvements (10 pts/issue)\n" +
+            "- 🔧 **Pull Requests** — submitting code (15 pts + 5 pts if merged)\n" +
+            "- 👀 **PR Reviews** — code review feedback (3 pts/review)\n" +
+            "- 💬 **Issue Comments** — helping debug and solve problems (2 pts/comment)\n" +
+            "- 💡 **Discussion Comments** — sharing knowledge (1 pt/comment)\n\n" +
+            "**⭐ Star Ratings** are based on your **all-time contributions** compared to the entire community:\n" +
+            "- ⭐⭐⭐⭐⭐ Top 3% of all contributors\n" +
+            "- ⭐⭐⭐⭐ Top 10%\n" +
+            "- ⭐⭐⭐ Top 25%\n" +
+            "- ⭐⭐ Top 50%\n" +
+            "- ⭐ Top 75%\n\n" +
+            "_Quality always matters more than quantity — thank you for making this community awesome!_ 🎉\n\n" +
             "---\n\n" +
             "## 💛 Support OpenCloudTouch\n\n" +
-            "Want to help keep this project alive?\n\n" +
+            "Want to help keep this project alive? Your support means the world to us!\n\n" +
             "☕ **[Buy Me a Coffee](https://buymeacoffee.com/b49rjg5k6vj)**\n\n" +
             "Financial supporters are featured in the **Settings → About** section of the web interface!\n\n" +
             "---\n\n" +
-            "_Auto-generated monthly announcement • Next update: " + ((now | gmtime | mktime + 2592000) | strftime("%B 1, %Y")) + "_"
+            "_Auto-generated monthly announcement • Next spotlight: " + ((now | gmtime | mktime + 2592000) | strftime("%B 1, %Y")) + "_"
           ')
           
           echo "body<<EOF" >> $GITHUB_OUTPUT
