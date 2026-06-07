@@ -30,14 +30,11 @@ jobs:
           SINCE=$(date -d '30 days ago' +'%Y-%m-%d' 2>/dev/null || date -v-30d +'%Y-%m-%d')
           echo "Analyzing activity since $SINCE..."
 
-          # Collect issue comments (last 30 days)
+          # Collect issue comments with body text (last 30 days)
           echo "📊 Collecting issue comments (last 30 days)..."
           ISSUE_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/comments?since=${SINCE}T00:00:00Z&per_page=100" --paginate --jq '
-            [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | .user.login] | 
-            group_by(.) | 
-            map({author: .[0], count: length}) | 
-            sort_by(.count) | 
-            reverse
+            [.[] | select(.user.type != "Bot" and .user.login != "scheilch" and .user.login != "oct-support") | 
+             {author: .user.login, body: .body}]
           ')
 
           # Collect issues created with labels (last 30 days)
@@ -117,7 +114,7 @@ jobs:
             map({author: .[0], count: length})
           ")
 
-          # Collect discussion comments (last 30 days)
+          # Collect discussion comments with body text (last 30 days)
           echo "📊 Collecting discussion comments (last 30 days)..."
           DISCUSSION_COMMENTS=$(gh api graphql -f query='
             query($owner: String!, $repo: String!) {
@@ -127,6 +124,7 @@ jobs:
                     comments(first: 100) {
                       nodes {
                         author { login }
+                        body
                         createdAt
                       }
                     }
@@ -137,9 +135,7 @@ jobs:
           ' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" --jq "
             [.data.repository.discussions.nodes[].comments.nodes[] | 
              select(.createdAt >= \"${SINCE}T00:00:00Z\" and .author.login != null and .author.login != \"scheilch\" and .author.login != \"oct-support\") | 
-             .author.login] |
-            group_by(.) |
-            map({author: .[0], count: length})
+             {author: .author.login, body: .body}]
           ")
 
           # Collect LIFETIME statistics for all contributors
@@ -240,14 +236,26 @@ jobs:
              unique |
              map(. as $author | {
                author: $author,
-               issueComments: ([$issueComments[] | select(.author == $author) | .count] | add // 0),
+               # Issue comments: count comments and calculate logarithmic score based on word count
+               issueCommentCount: ([$issueComments[] | select(.author == $author)] | length),
+               issueCommentWords: ([$issueComments[] | select(.author == $author) | .body | split(" ") | length] | add // 0),
+               issueCommentScore: (
+                 ([$issueComments[] | select(.author == $author) | .body | split(" ") | length] | add // 0) as $words |
+                 if $words > 0 then (1 + ($words / 10)) | log / (2 | log) else 0 end
+               ),
                issuesCreated: ([$issuesCreated[] | select(.author == $author) | .issues | length] | add // 0),
                bugReports: ([$issuesCreated[] | select(.author == $author) | .bugCount] | add // 0),
                featureRequests: ([$issuesCreated[] | select(.author == $author) | .featureCount] | add // 0),
                prsCreated: ([$prsCreated[] | select(.author == $author) | .prs | length] | add // 0),
                prsMerged: ([$prsCreated[] | select(.author == $author) | .merged] | add // 0),
-               prReviews: ([$prReviews[] | select(.author == $author) | .count] | add // 0),
-               discussionComments: ([$discussionComments[] | select(.author == $author) | .count] | add // 0)
+               prReviews: ([$prReviews[] | select(.author == $author)] | length),
+               # Discussion comments: count comments and calculate logarithmic score based on word count
+               discussionCommentCount: ([$discussionComments[] | select(.author == $author)] | length),
+               discussionCommentWords: ([$discussionComments[] | select(.author == $author) | .body | split(" ") | length] | add // 0),
+               discussionCommentScore: (
+                 ([$discussionComments[] | select(.author == $author) | .body | split(" ") | length] | add // 0) as $words |
+                 if $words > 0 then (1 + ($words / 10)) | log / (2 | log) else 0 end
+               )
              }) |
              # Add lifetime stats and stars
              map(. as $user | 
@@ -263,7 +271,7 @@ jobs:
                }
              ) |
              map(. + {
-               score: ((.issuesCreated * 10) + (.prsCreated * 15) + (.prsMerged * 5) + (.prReviews * 3) + (.issueComments * 2) + .discussionComments)
+               score: ((.issuesCreated * 10) + (.prsCreated * 15) + (.prsMerged * 5) + (.prReviews * 3) + .issueCommentScore + .discussionCommentScore)
              }) |
              sort_by(.score) |
              reverse |
@@ -303,19 +311,19 @@ jobs:
                 (if .prsMerged > 0 then " (**\(.prsMerged) merged** ✅)" else "" end) + 
                 " — lifetime: **\(.lifetimePRs)** total\n" else "" end) +
               (if .prReviews > 0 then "- 👀 **\(.prReviews) PR review(s)** — helping improve code quality\n" else "" end) +
-              (if .issueComments > 0 then "- 💬 **\(.issueComments) comment(s)** on issues — lifetime: **\(.lifetimeComments)** total\n" else "" end) +
-              (if .discussionComments > 0 then "- 💡 **\(.discussionComments) discussion comment(s)** — lifetime: **\(.lifetimeDiscussions)** total\n" else "" end) +
+              (if .issueCommentCount > 0 then "- 💬 **\(.issueCommentCount) comment(s)** on issues (\(.issueCommentWords) words) — lifetime: **\(.lifetimeComments)** total\n" else "" end) +
+              (if .discussionCommentCount > 0 then "- 💡 **\(.discussionCommentCount) discussion comment(s)** (\(.discussionCommentWords) words) — lifetime: **\(.lifetimeDiscussions)** total\n" else "" end) +
               "\n**Impact:** " + (
                 # Determine impact based on actual contributions
                 if .prsMerged > 0 and .bugReports > 0 then "Code contributor and bug hunter — directly improving the codebase!"
                 elif .prsMerged > 0 then "Code contributor — thank you for your pull requests!"
                 elif .prsCreated > 0 then "Active contributor — your PRs are in review!"
-                elif .bugReports > 2 and .issueComments > 5 then "Bug detective and community helper — finding issues and supporting others"
+                elif .bugReports > 2 and .issueCommentCount > 5 then "Bug detective and community helper — finding issues and supporting others"
                 elif .bugReports > 2 then "Bug reporter — helping us squash those pesky bugs"
                 elif .featureRequests > 2 then "Feature visionary — shaping the future of OpenCloudTouch"
-                elif .issueComments > 10 and .discussionComments > 5 then "Community champion — active support across issues and discussions"
-                elif .issueComments > 10 then "Support hero — always there to help others"
-                elif .discussionComments > 5 then "Knowledge sharer — enriching our community discussions"
+                elif .issueCommentCount > 10 and .discussionCommentCount > 5 then "Community champion — active support across issues and discussions"
+                elif .issueCommentCount > 10 then "Support hero — always there to help others"
+                elif .discussionCommentCount > 5 then "Knowledge sharer — enriching our community discussions"
                 elif .prReviews > 3 then "Code reviewer — ensuring quality through thorough reviews"
                 else "Active community member — every contribution counts!"
                 end
@@ -328,8 +336,11 @@ jobs:
             "- ✨ **Feature Requests** — suggesting improvements (10 pts/issue)\n" +
             "- 🔧 **Pull Requests** — submitting code (15 pts + 5 pts if merged)\n" +
             "- 👀 **PR Reviews** — code review feedback (3 pts/review)\n" +
-            "- 💬 **Issue Comments** — helping debug and solve problems (2 pts/comment)\n" +
-            "- 💡 **Discussion Comments** — sharing knowledge (1 pt/comment)\n\n" +
+            "- 💬 **Issue Comments** — quality over quantity! Score = log₂(1 + words/10)\n" +
+            "  - Short link (#123): ~1 point\n" +
+            "  - Helpful explanation (50 words): ~2.3 points\n" +
+            "  - Detailed answer (200 words): ~4.4 points\n" +
+            "- 💡 **Discussion Comments** — same formula, rewarding thoughtful contributions\n\n" +
             "**⭐ Star Ratings** are based on your **all-time contributions** compared to the entire community:\n" +
             "- ⭐⭐⭐⭐⭐ Top 3% of all contributors\n" +
             "- ⭐⭐⭐⭐ Top 10%\n" +
