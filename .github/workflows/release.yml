@@ -364,6 +364,15 @@ jobs:
 
           ---
 
+          ### 🍓 Raspberry Pi
+
+          SD card images are released independently. Flash the latest image and it will
+          automatically pull this version on first boot.
+
+          👉 **[Download Raspberry Pi SD Card Images](https://github.com/${{ github.repository }}/releases?q=raspi&expanded=true)**
+
+          ---
+
           ${COMPARE_TEXT}
           DOCKER_EOF
 
@@ -406,7 +415,7 @@ jobs:
   # BUILD DOCKER + RASPBERRY PI IMAGES (via reusable workflow)
   # ============================================================================
   build-images:
-    name: Build Images
+    name: Build Docker Images
     needs: [gh-release, tag]
     permissions:
       packages: write
@@ -415,12 +424,11 @@ jobs:
     uses: ./.github/workflows/build-images.yml
     with:
       version: ${{ needs.gh-release.outputs.version }}
-      architectures: all
-      attach_to_release: true
       checkout_ref: ${{ needs.tag.outputs.tag }}
       mark_as_stable: ${{ inputs.mark_as_stable && !inputs.prerelease }}
     secrets:
       BUILD_SIGNING_KEY: ${{ secrets.BUILD_SIGNING_KEY }}
+      SUPPORTERS_API_PASS: ${{ secrets.SUPPORTERS_API_PASS }}
 
   # ============================================================================
   # PUBLISH RELEASE (draft → public, only after successful image build)
@@ -470,7 +478,6 @@ jobs:
           |------|--------|
           | Draft release | Created |
           | Docker images | Built + pushed |
-          | Raspi images | Built + attached |
           | Release published | **Live** |
 
           **Release**: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}
@@ -478,14 +485,14 @@ jobs:
 
       - name: Update next-version variables
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           VERSION="${{ needs.gh-release.outputs.version }}"
           MAJOR=$(echo "$VERSION" | cut -d. -f1)
           MINOR=$(echo "$VERSION" | cut -d. -f2)
           PATCH=$(echo "$VERSION" | cut -d. -f3)
 
-          gh variable set NEXT_PATCH --body "${MAJOR}.${MINOR}.$((PATCH + 1)}" --repo ${{ github.repository }}
+          gh variable set NEXT_PATCH --body "${MAJOR}.${MINOR}.$((PATCH + 1))" --repo ${{ github.repository }}
           gh variable set NEXT_MINOR --body "${MAJOR}.$((MINOR + 1)).0" --repo ${{ github.repository }}
           gh variable set NEXT_MAJOR --body "$((MAJOR + 1)).0.0" --repo ${{ github.repository }}
 

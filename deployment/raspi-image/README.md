@@ -92,7 +92,7 @@ raspi-image/
 │   ├── oct-update.sh            # Update helper script
 │   └── oct-config.txt           # User config template
 └── .github/workflows/
-    └── build-raspi-image.yml    # CI/CD for image builds
+    └── build-raspi.yml          # CI/CD for image builds
 ```
 
 ## CI/CD

@@ -1,28 +1,28 @@
-/**
- * UX Workflow Screenshots — Vollständige Visuelle Dokumentation
+ï»¿/**
+ * UX Workflow Screenshots â€” VollstÃ¤ndige Visuelle Dokumentation
  *
- * Nimmt Screenshots aller UI-Elemente in folgenden Zuständen auf:
+ * Nimmt Screenshots aller UI-Elemente in folgenden ZustÃ¤nden auf:
  *
- *   DARK  ? Natives App-Theme (Bose dark background)
- *   LIGHT ? Heller Analyse-Modus (weiß, für Design-Inspektion)
- *   STATE ? Interaktions-Zustand (loading, error, focus, hover)
+ *   DARK  â†’ Natives App-Theme (Bose dark background)
+ *   LIGHT â†’ Heller Analyse-Modus (weiÃŸ, fÃ¼r Design-Inspektion)
+ *   STATE â†’ Interaktions-Zustand (loading, error, focus, hover)
  *
  * Organisation der Screenshot-Dateinamen:
  *   {index}_{seite}_{beschreibung}__{dark|light}
  *   Beispiel: 02a_presets_full-page__dark.png
  *
- * Alle API-Calls werden intercepted — kein Backend erforderlich.
+ * Alle API-Calls werden intercepted â€” kein Backend erforderlich.
  *
  * Aufruf:
- *   npm run screenshots           ? headless automatischer Lauf
- *   npm run screenshots:headed    ? headed (für Hover-States)
- *   npm run screenshots:open      ? Cypress Interactive UI
+ *   npm run screenshots           â†’ headless automatischer Lauf
+ *   npm run screenshots:headed    â†’ headed (fÃ¼r Hover-States)
+ *   npm run screenshots:open      â†’ Cypress Interactive UI
  *
  * Output: tests/e2e/screenshots/ux/
  */
 
 // =============================================================================
-// MOCK DATA (deterministische Fixtures für Screensh oots)
+// MOCK DATA (deterministische Fixtures fÃ¼r Screensh oots)
 // =============================================================================
 
 const DEVICE_ID_1 = "A1B2C3D4E5F6";
@@ -85,19 +85,19 @@ const MOCK_PRESETS_MIXED = [
     station_uuid: "uuid-tunein",
     station_name: "Rock Antenne",
     station_url: "http://stream.rockantenne.de/rockantenne/stream/icy",
-    source: "TUNEIN", // Cloud-abhängig ? zeigt Cloud-Badge
+    source: "TUNEIN", // Cloud-abhÃ¤ngig â†’ zeigt Cloud-Badge
     station_homepage: null,
     station_favicon: null,
     created_at: NOW,
     updated_at: NOW,
   },
-  // Preset 4—6: leer (zeigt leere Platzhalter-Buttons)
+  // Preset 4â€”6: leer (zeigt leere Platzhalter-Buttons)
 ];
 
 // Alle Presets leer
 const MOCK_PRESETS_EMPTY: never[] = [];
 
-// Manuell hinzugefügte IPs
+// Manuell hinzugefÃ¼gte IPs
 const MOCK_MANUAL_IPS = ["192.168.1.100", "192.168.1.101"];
 
 // =============================================================================
@@ -248,7 +248,7 @@ function scrFull(name: string): void {
  */
 function screenshotBoth(name: string, opts: Partial<Cypress.ScreenshotOptions> = {}): void {
   // Expand layout so fullPage captures all content (app has height:100vh + overflow-y:auto)
-  // Only override height — do NOT remove overflow-x:hidden or horizontal scrollbars appear.
+  // Only override height â€” do NOT remove overflow-x:hidden or horizontal scrollbars appear.
   // Force synchronous reflow via offsetHeight read so dark screenshot sees the new height.
   cy.document().then((doc) => {
     const s = doc.createElement("style");
@@ -283,8 +283,8 @@ function screenshotBoth(name: string, opts: Partial<Cypress.ScreenshotOptions> =
 // These are screenshot-documentation tests, not functional assertion tests
 Cypress.on('uncaught:exception', () => false);
 
-describe("UX Screenshots — App-Workflow Dokumentation", () => {
-  // Standard-Intercepts für alle Tests
+describe("UX Screenshots â€” App-Workflow Dokumentation", () => {
+  // Standard-Intercepts fÃ¼r alle Tests
   beforeEach(() => {
     cy.intercept("GET", "/api/devices", { body: { devices: MOCK_DEVICES } }).as("getDevices");
     cy.intercept("GET", `/api/presets/${DEVICE_ID_1}`, {
@@ -317,22 +317,22 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
   });
 
   // ===========================================================================
-  // 01 — Welcome / EmptyState
+  // 01 â€” Welcome / EmptyState
   // ===========================================================================
 
-  describe("01 — Welcome / EmptyState", () => {
+  describe("01 â€” Welcome / EmptyState", () => {
     beforeEach(() => {
-      // Keine Geräte ? EmptyState wird angezeigt
+      // Keine GerÃ¤te â†’ EmptyState wird angezeigt
       cy.intercept("GET", "/api/devices", { body: [] }).as("getDevicesEmpty");
     });
 
-    it("01a — Vollseite: Initialzustand", () => {
+    it("01a â€” Vollseite: Initialzustand", () => {
       cy.visit("/welcome");
       cy.wait(800);
       screenshotBoth("01a_welcome_initial-state");
     });
 
-    it("01b — Discover-Button: Normal + Fokus", () => {
+    it("01b â€” Discover-Button: Normal + Fokus", () => {
       cy.visit("/welcome");
       cy.wait(600);
 
@@ -349,7 +349,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       removeLightMode();
     });
 
-    it("01c — Discover-Button: Aktiver Ladevorgang", () => {
+    it("01c â€” Discover-Button: Aktiver Ladevorgang", () => {
       // Simuliert laufenden Discovery-Stream (SSE antwortet sofort mit data)
       cy.intercept("GET", "/api/devices/discover/stream*", {
         delay: 5000,
@@ -368,7 +368,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       removeLightMode();
     });
 
-    it("01d — Manuelle IP Sektion: Details geöffnet", () => {
+    it("01d â€” Manuelle IP Sektion: Details geÃ¶ffnet", () => {
       cy.visit("/welcome");
       cy.wait(500);
 
@@ -381,7 +381,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       screenshotBoth("01d_welcome_manual-ip-section__expanded");
     });
 
-    it("01e — Manuelle IP Modal: Geöffnet", () => {
+    it("01e â€” Manuelle IP Modal: GeÃ¶ffnet", () => {
       cy.visit("/welcome");
       cy.wait(500);
 
@@ -401,13 +401,13 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
             removeLightMode();
           }
         } else {
-          cy.log("manual-add-button not found — taking fallback screenshot");
+          cy.log("manual-add-button not found â€” taking fallback screenshot");
           screenshotBoth("01e_welcome_manual-ip-modal__no-button");
         }
       });
     });
 
-    it("01f — Mobile (375Ã—812): Vollseite", () => {
+    it("01f â€” Mobile (375Ãƒâ€”812): Vollseite", () => {
       cy.viewport(375, 812);
       cy.visit("/welcome");
       cy.wait(800);
@@ -416,18 +416,18 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
   });
 
   // ===========================================================================
-  // 02 — Presets-Seite (RadioPresets)
+  // 02 â€” Presets-Seite (RadioPresets)
   // ===========================================================================
 
-  describe("02 — Presets-Seite", () => {
-    it("02a — Vollseite: Gemischte Presets (3 belegt, 3 leer)", () => {
+  describe("02 â€” Presets-Seite", () => {
+    it("02a â€” Vollseite: Gemischte Presets (3 belegt, 3 leer)", () => {
       cy.visit("/");
       cy.wait("@getDevices");
       cy.wait(600);
       screenshotBoth("02a_presets_full-page__mixed-presets");
     });
 
-    it("02b — Vollseite: Alle Presets leer", () => {
+    it("02b â€” Vollseite: Alle Presets leer", () => {
       cy.intercept("GET", `/api/presets/${DEVICE_ID_1}`, { body: MOCK_PRESETS_EMPTY });
       cy.intercept("GET", `/api/presets/${DEVICE_ID_2}`, { body: MOCK_PRESETS_EMPTY });
 
@@ -437,7 +437,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       screenshotBoth("02b_presets_full-page__all-empty");
     });
 
-    it("02c — Device-Card / Swiper: Gerät 1", () => {
+    it("02c â€” Device-Card / Swiper: GerÃ¤t 1", () => {
       cy.visit("/");
       cy.wait("@getDevices");
       cy.wait(600); // Allow framer-motion initial animation to complete
@@ -445,7 +445,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       // Screenshot whole page (device card is inside swiper)
       screenshotBoth("02c_presets_device-card__device-1");
 
-      // Gerät wechseln — use body.then() to avoid cy.get() timeout
+      // GerÃ¤t wechseln â€” use body.then() to avoid cy.get() timeout
       cy.get("body").then(($body) => {
         const $btn = $body.find("[data-test='device-next']");
         if ($btn.length > 0 && !$btn.prop("disabled")) {
@@ -453,17 +453,17 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
           cy.wait(400);
           screenshotBoth("02c_presets_device-card__device-2");
         } else {
-          cy.log("device-next not found or disabled — skipping device-2 screenshot");
+          cy.log("device-next not found or disabled â€” skipping device-2 screenshot");
         }
       });
     });
 
-    it("02d — Preset-Button: Alle Status-Varianten", () => {
+    it("02d â€” Preset-Button: Alle Status-Varianten", () => {
       cy.visit("/");
       cy.wait("@getDevices");
       cy.wait(800);
 
-      // Vollständiges Preset-Grid (belegt + leer + Cloud-Badge)
+      // VollstÃ¤ndiges Preset-Grid (belegt + leer + Cloud-Badge)
       scrFull("02d_presets_preset-grid__all-states__dark");
       injectLightMode();
       scrFull("02d_presets_preset-grid__all-states__light");
@@ -499,7 +499,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       });
     });
 
-    it("02e — Lautstärke-Regler (Volume Slider)", () => {
+    it("02e â€” LautstÃ¤rke-Regler (Volume Slider)", () => {
       cy.visit("/");
       cy.wait("@getDevices");
       cy.wait(600);
@@ -517,13 +517,13 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
             removeLightMode();
           }
         } else {
-          cy.log("volume-slider not in DOM — taking full-page fallback screenshot");
+          cy.log("volume-slider not in DOM â€” taking full-page fallback screenshot");
           screenshotBoth("02e_presets_volume-slider__full-page-fallback");
         }
       });
     });
 
-    it("02f — RadioSearch Modal: Geöffnet", () => {
+    it("02f â€” RadioSearch Modal: GeÃ¶ffnet", () => {
       cy.visit("/");
       cy.wait("@getDevices");
       cy.wait(600);
@@ -531,27 +531,27 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       cy.intercept("GET", "/api/radio-browser*", { body: [] });
       cy.intercept("GET", "/radiobrowser*", { body: [] });
 
-      // Auf leeren Preset klicken — .preset-empty ist der <button> in leerem .preset-button
+      // Auf leeren Preset klicken â€” .preset-empty ist der <button> in leerem .preset-button
       cy.get("body").then(($body) => {
         if ($body.find(".preset-empty").length > 0) {
           cy.get(".preset-empty").eq(0).scrollIntoView().click();
           cy.wait(600);
-          // Modal is position:fixed — fullPage capture duplicates it in every viewport
+          // Modal is position:fixed â€” fullPage capture duplicates it in every viewport
           // chunk. Use viewport-only capture to get a single clean modal screenshot.
           screenshotViewport("02f_presets_radio-search-modal__open");
         } else {
-          cy.log("No empty presets found — skipping modal screenshot");
+          cy.log("No empty presets found â€” skipping modal screenshot");
           scrFull("02f_presets_radio-search-modal__no-empty-preset__dark");
         }
       });
     });
 
-    it("02g — Navigation-Bar: Normal + aktive States", () => {
+    it("02g â€” Navigation-Bar: Normal + aktive States", () => {
       cy.visit("/");
       cy.wait("@getDevices");
       cy.wait(600);
 
-      // Use body.then() to avoid timeout — Navigation only renders when devices.length > 0
+      // Use body.then() to avoid timeout â€” Navigation only renders when devices.length > 0
       cy.get("body").then(($body) => {
         if ($body.find("nav.nav").length > 0) {
           scrFull("02g_navigation__presets-active__dark");
@@ -566,13 +566,13 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
             removeLightMode();
           }
         } else {
-          cy.log("nav.nav not in DOM — taking full-page fallback screenshot");
+          cy.log("nav.nav not in DOM â€” taking full-page fallback screenshot");
           scrFull("02g_navigation__not-found__dark");
         }
       });
     });
 
-    it("02h — Mobile (375Ã—812): Vollseite", () => {
+    it("02h â€” Mobile (375Ãƒâ€”812): Vollseite", () => {
       cy.viewport(375, 812);
       cy.visit("/");
       cy.wait("@getDevices");
@@ -580,7 +580,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       screenshotBoth("02h_presets_mobile-375px__full");
     });
 
-    it("02i — Tablet (768Ã—1024): Vollseite", () => {
+    it("02i â€” Tablet (768Ãƒâ€”1024): Vollseite", () => {
       cy.viewport(768, 1024);
       cy.visit("/");
       cy.wait("@getDevices");
@@ -603,24 +603,24 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
   });
 
   // ===========================================================================
-  // 03 — Settings-Seite
+  // 03 â€” Settings-Seite
   // ===========================================================================
 
-  describe("03 — Settings-Seite", () => {
-    it("03a — Vollseite: Mit manuellen IPs", () => {
+  describe("03 â€” Settings-Seite", () => {
+    it("03a â€” Vollseite: Mit manuellen IPs", () => {
       cy.visit("/settings");
       cy.wait(1000);
       screenshotBoth("03a_settings_full-page__with-ips");
     });
 
-    it("03b — Vollseite: Keine manuellen IPs", () => {
+    it("03b â€” Vollseite: Keine manuellen IPs", () => {
       cy.intercept("GET", "/api/settings/manual-ips", { body: [] });
       cy.visit("/settings");
       cy.wait(1000);
       screenshotBoth("03b_settings_full-page__empty-ips");
     });
 
-    it("03c — IP-Eingabe-Formular: Fokus", () => {
+    it("03c â€” IP-Eingabe-Formular: Fokus", () => {
       cy.visit("/settings");
       cy.wait(1500); // Wait for Settings to load (framer-motion + React Query)
 
@@ -629,14 +629,14 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
           cy.get(".ip-input").first().focus();
           screenshotBoth("03c_settings_add-ip-form__focused");
         } else {
-          cy.log("ip-input not in DOM — taking fallback screenshot");
+          cy.log("ip-input not in DOM â€” taking fallback screenshot");
           scrFull("03c_settings_ip-input__not-found__dark");          injectLightMode();
           scrFull("03c_settings_ip-input__not-found__light");
           removeLightMode();        }
       });
     });
 
-    it("03d — IP-Eingabe-Formular: Validierungsfehler", () => {
+    it("03d â€” IP-Eingabe-Formular: Validierungsfehler", () => {
       cy.visit("/settings");
       cy.wait(1500); // Wait for Settings to load (framer-motion + React Query)
 
@@ -647,14 +647,14 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
           cy.wait(400);
           screenshotBoth("03d_settings_add-ip-form__validation-error");
         } else {
-          cy.log("ip-input not in DOM — taking fallback screenshot");
+          cy.log("ip-input not in DOM â€” taking fallback screenshot");
           scrFull("03d_settings_ip-input__not-found__dark");          injectLightMode();
           scrFull("03d_settings_ip-input__not-found__light");
           removeLightMode();        }
       });
     });
 
-    it("03e — IP-Eintrag: Delete-Button Hover", () => {
+    it("03e â€” IP-Eintrag: Delete-Button Hover", () => {
       cy.visit("/settings");
       cy.wait(1500); // Wait for Settings to load (framer-motion + React Query)
 
@@ -667,14 +667,14 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
           scrFull("03e_settings_ip-entry__delete-hover__light");
           removeLightMode();
         } else {
-          cy.log("No delete buttons found (no manual IPs) — taking fallback screenshot");
+          cy.log("No delete buttons found (no manual IPs) â€” taking fallback screenshot");
           scrFull("03e_settings_ip-entry__no-entries__dark");          injectLightMode();
           scrFull("03e_settings_ip-entry__no-entries__light");
           removeLightMode();        }
       });
     });
 
-    it("03f — Mobile (375Ã—812): Vollseite", () => {
+    it("03f â€” Mobile (375Ãƒâ€”812): Vollseite", () => {
       cy.viewport(375, 812);
       cy.visit("/settings");
       cy.wait(1000);
@@ -683,18 +683,18 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
   });
 
   // ===========================================================================
-  // 04 — Setup Wizard
+  // 04 â€” Setup Wizard
   // ===========================================================================
 
-  describe("04 — Setup Wizard", () => {
-    it("04a — Wizard: Start mit vorselektiertem Gerät (Step 1)", () => {
+  describe("04 â€” Setup Wizard", () => {
+    it("04a â€” Wizard: Start mit vorselektiertem GerÃ¤t (Step 1)", () => {
       cy.visit(`/setup-wizard?deviceId=${DEVICE_ID_1}`);
       cy.wait("@getDevices");
       cy.get(".setup-wizard-page", { timeout: 10000 }).should("exist");
       screenshotBoth("04a_wizard_start__device-preselected");
     });
 
-    it("04e — Wizard: Kein Gerät vorhanden (EmptyState)", () => {
+    it("04e â€” Wizard: Kein GerÃ¤t vorhanden (EmptyState)", () => {
       cy.intercept("GET", "/api/devices", { body: [] }).as("getDevicesEmpty");
       cy.visit("/setup-wizard");
       cy.wait("@getDevicesEmpty");
@@ -702,7 +702,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       screenshotBoth("04e_wizard_empty-state__no-devices");
     });
 
-    it("04f — Mobile (375x812): Wizard Step 1", () => {
+    it("04f â€” Mobile (375x812): Wizard Step 1", () => {
       cy.viewport(375, 812);
       cy.visit(`/setup-wizard?deviceId=${DEVICE_ID_1}`);
       cy.wait("@getDevices");
@@ -712,12 +712,12 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
   });
 
   // ===========================================================================
-  // 05 — Lade- und Fehlerzustände
+  // 05 â€” Lade- und FehlerzustÃ¤nde
   // ===========================================================================
 
-  describe("05 — Lade- und Fehlerzustände", () => {
-    it("05a — App: Initialer Ladezustand", () => {
-      // Verzögerte API-Antwort ? Ladeanimation nachweislich sichtbar
+  describe("05 â€” Lade- und FehlerzustÃ¤nde", () => {
+    it("05a â€” App: Initialer Ladezustand", () => {
+      // VerzÃ¶gerte API-Antwort â†’ Ladeanimation nachweislich sichtbar
       cy.intercept("GET", "/api/devices", (req) => {
         req.reply({ delay: 3000, body: MOCK_DEVICES });
       }).as("getDevicesDelayed");
@@ -730,7 +730,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       removeLightMode();
     });
 
-    it("05b — App: Fehler beim Laden der Geräte", () => {
+    it("05b â€” App: Fehler beim Laden der GerÃ¤te", () => {
       cy.intercept("GET", "/api/devices", {
         statusCode: 500,
         body: { detail: "Internal Server Error" },
@@ -740,8 +740,8 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       screenshotBoth("05b_app_error-state__device-load-failed");
     });
 
-    it("05c — Presets: Ladezustand", () => {
-      // Verzögerte Preset-Antwort ? Ladeanimation sichtbar
+    it("05c â€” Presets: Ladezustand", () => {
+      // VerzÃ¶gerte Preset-Antwort â†’ Ladeanimation sichtbar
       cy.intercept("GET", `/api/presets/${DEVICE_ID_1}`, (req) => {
         req.reply({ delay: 3000, body: MOCK_PRESETS_MIXED });
       }).as("getPresetsLoading");
@@ -754,7 +754,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       removeLightMode();
     });
 
-    it("05d — Toast: Erfolgs-Nachricht", () => {
+    it("05d â€” Toast: Erfolgs-Nachricht", () => {
       cy.visit("/settings");
       cy.wait(1500); // Wait for Settings to load (framer-motion + React Query)
 
@@ -784,11 +784,11 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
   });
 
   // ===========================================================================
-  // 06 — Komponenten-Isolierung
+  // 06 â€” Komponenten-Isolierung
   // ===========================================================================
 
-  describe("06 — Komponenten-Isolierung", () => {
-    it("06a — Preset-Grid: 6 Buttons (gemischt, Cloud-Badge)", () => {
+  describe("06 â€” Komponenten-Isolierung", () => {
+    it("06a â€” Preset-Grid: 6 Buttons (gemischt, Cloud-Badge)", () => {
       cy.visit("/");
       cy.wait(1200);
 
@@ -798,12 +798,12 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       removeLightMode();
     });
 
-    it("06b — Lautstärke-Regler: Alle Positionen", () => {
+    it("06b â€” LautstÃ¤rke-Regler: Alle Positionen", () => {
       cy.visit("/");
       cy.wait("@getDevices");
       cy.wait(800);
 
-      // Use body.then() to avoid timeout — volume-input may be inside overflow:hidden
+      // Use body.then() to avoid timeout â€” volume-input may be inside overflow:hidden
       cy.get("body").then(($body) => {
         if ($body.find("input[type='range'].volume-input").length > 0) {
           screenshotBoth("06b_component_volume-slider__default");
@@ -820,14 +820,14 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
           scrFull("06b_component_volume-slider__at-100__light");
           removeLightMode();
         } else {
-          cy.log("volume-input not in DOM — taking full-page fallback screenshot");
+          cy.log("volume-input not in DOM â€” taking full-page fallback screenshot");
           screenshotBoth("06b_component_volume-slider__full-page-fallback");
         }
       });
     });
 
-    it("06c — Gerät-Swiper: Indikator-Punkte (3 Geräte simuliert)", () => {
-      // Füge drittes Mock-Gerät hinzu
+    it("06c â€” GerÃ¤t-Swiper: Indikator-Punkte (3 GerÃ¤te simuliert)", () => {
+      // FÃ¼ge drittes Mock-GerÃ¤t hinzu
       cy.intercept("GET", "/api/devices", {
         body: [
           ...MOCK_DEVICES,
@@ -848,14 +848,14 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
       screenshotBoth("06c_component_device-swiper__3-devices");
     });
 
-    it("06d — Leer-Zustand (EmptyState Komponente)", () => {
+    it("06d â€” Leer-Zustand (EmptyState Komponente)", () => {
       cy.intercept("GET", "/api/devices", { body: [] });
       cy.visit("/welcome");
       cy.wait(800);
       screenshotBoth("06d_component_empty-state__standalone");
     });
 
-    it("06e — Setup-Badge auf Gerät", () => {
+    it("06e â€” Setup-Badge auf GerÃ¤t", () => {
       cy.visit("/");
       cy.wait("@getDevices");
       cy.wait(800);
@@ -865,7 +865,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
         if ($body.find(".setup-badge").length > 0) {
           screenshotBoth("06e_component_setup-badge__visible");
         } else {
-          cy.log("Setup-Badge nicht im DOM — skipping");
+          cy.log("Setup-Badge nicht im DOM â€” skipping");
           scrFull("06e_component_setup-badge__not-present__dark");
         }
       });
@@ -873,10 +873,10 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
   });
 
   // ===========================================================================
-  // 07 — Viewport-Matrix (Responsive Design Audit)
+  // 07 â€” Viewport-Matrix (Responsive Design Audit)
   // ===========================================================================
 
-  describe("07 — Viewport-Matrix alle Seiten", () => {
+  describe("07 â€” Viewport-Matrix alle Seiten", () => {
     const VIEWPORTS = [
       { name: "mobile-375", width: 375, height: 812 },
       { name: "tablet-768", width: 768, height: 1024 },
@@ -885,7 +885,7 @@ describe("UX Screenshots — App-Workflow Dokumentation", () => {
     ] as const;
 
     VIEWPORTS.forEach(({ name, width, height }) => {
-      it(`07_${name} — Presets-Seite`, () => {
+      it(`07_${name} â€” Presets-Seite`, () => {
         cy.viewport(width, height);
         cy.visit("/");
         cy.wait(1200);

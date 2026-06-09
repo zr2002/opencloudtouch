@@ -100,8 +100,9 @@ Pre-built images for Raspberry Pi 3/4/5 are available on the [Releases page](htt
 
 | Tag | Description |
 |-----|-------------|
-| `latest` | Latest release (recommended) |
-| `1.2.5` | Specific version |
+| `stable` | Latest stable release (recommended) |
+| `latest` | Latest release (same as `stable`) |
+| `1.5.1` | Specific version ([see all tags](https://github.com/opencloudtouch/opencloudtouch/pkgs/container/opencloudtouch/versions)) |
 
 
 ### Supported Architectures

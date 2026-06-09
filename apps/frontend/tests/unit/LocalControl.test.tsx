@@ -100,10 +100,17 @@ vi.mock("../../src/hooks/useZones", () => ({
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", () => ({
   useNavigate: () => mockNavigate,
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
 
 vi.mock("../../src/components/SetupBadge", () => ({
   default: () => <span data-testid="setup-badge" />,
+}));
+
+vi.mock("../../src/components/DeviceNameEditor", () => ({
+  default: ({ name }: { name: string }) => (
+    <h2 className="device-name" data-test="device-name">{name}</h2>
+  ),
 }));
 
 const mockDevices = [

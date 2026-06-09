@@ -6,10 +6,12 @@ All business logic lives in WizardService; routes only handle HTTP concerns.
 """
 
 import asyncio
+import ipaddress
 import logging
 import socket
 from typing import Annotated, Any, Dict
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi import status as http_status
 
@@ -47,6 +49,8 @@ from opencloudtouch.setup.api_models import (
     VerifyRedirectResponse,
     VerifySetupRequest,
     VerifySetupResponse,
+    ValidateHostnameRequest,
+    ValidateHostnameResponse,
     WizardCompleteRequest,
     WizardCompleteResponse,
 )
@@ -145,6 +149,161 @@ async def wizard_detect_strategy(request: Request) -> DetectStrategyResponse:
             "Die BMX-URL muss zus�tzlich ge�ndert werden."
         ),
     )
+
+
+async def _check_oct_reachability(hostname: str, port: int) -> tuple[bool, str | None]:
+    """Check if OpenCloudTouch is reachable at hostname:port.
+
+    Returns:
+        Tuple of (reachable, error_message)
+    """
+    url = f"http://{hostname}:{port}/health"  # noqa: S5332
+    logger.info("Checking OCT reachability: %s", url)
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    if data.get("service") == "opencloudtouch":
+                        logger.info("OCT reachable at %s", url)
+                        return True, None
+                    else:
+                        error = f"Server at {hostname}:{port} is not OpenCloudTouch"
+                        logger.warning("Non-OCT response at %s: %s", url, data)
+                        return False, error
+                except Exception:
+                    error = f"Invalid response from {hostname}:{port}"
+                    logger.warning("Invalid JSON at %s", url, exc_info=True)
+                    return False, error
+            else:
+                error = f"HTTP {response.status_code} from {hostname}:{port}"
+                logger.warning("HTTP %s from %s", response.status_code, url)
+                return False, error
+
+    except httpx.ConnectError:
+        error = f"Connection refused at {hostname}:{port}"
+        logger.warning("Connection refused: %s", url)
+        return False, error
+    except httpx.TimeoutException:
+        error = f"Connection timeout to {hostname}:{port}"
+        logger.warning("Timeout: %s", url)
+        return False, error
+    except Exception as e:
+        error = f"Could not reach {hostname}:{port}"
+        logger.warning("OCT check failed for %s: %s", url, e, exc_info=True)
+        return False, error
+
+
+@wizard_router.post("/wizard/validate-hostname")
+async def wizard_validate_hostname(
+    request: ValidateHostnameRequest,
+) -> ValidateHostnameResponse:
+    """Validate a hostname or IP via DNS resolution and OCT reachability.
+
+    Used by Wizard Step 5 when the user enters a hostname or IP address.
+    For hostnames: validates DNS resolution and checks if OCT is reachable.
+    For IPs: skips DNS resolution and only checks if OCT is reachable.
+
+    Returns whether the hostname/IP resolves, if it matches the expected IP,
+    and whether OCT is reachable at the given hostname:port.
+    """
+    hostname = request.hostname
+    port = request.port
+    logger.info("Validating hostname/IP and OCT reachability: %s", hostname)
+
+    # Check if input is an IP address (skip DNS resolution for IPs)
+    is_ip = False
+    try:
+        ipaddress.ip_address(hostname)
+        is_ip = True
+        logger.info("Input is an IP address, skipping DNS resolution")
+    except ValueError:
+        pass  # Not an IP, proceed with DNS resolution
+
+    # For IPs: skip DNS resolution, only check OCT reachability
+    if is_ip:
+        oct_reachable, oct_error = await _check_oct_reachability(hostname, port)
+        return ValidateHostnameResponse(
+            resolvable=True,  # IPs are always "resolvable" (they resolve to themselves)
+            resolved_ip=hostname,
+            matches_expected=None,  # No DNS comparison needed for IPs
+            oct_reachable=oct_reachable,
+            error=None,
+            oct_error=oct_error,
+        )
+
+    # For hostnames: perform DNS resolution
+    try:
+        result = await asyncio.to_thread(socket.getaddrinfo, hostname, None)
+        if not result:
+            return ValidateHostnameResponse(
+                resolvable=False,
+                resolved_ip=None,
+                matches_expected=None,
+                oct_reachable=False,
+                error=f"DNS resolution returned no results for '{hostname}'",
+                oct_error=None,
+            )
+
+        resolved_ip: str = str(result[0][4][0])
+
+        matches = None
+        if request.expected_ip is not None:
+            matches = resolved_ip == request.expected_ip
+
+        logger.info(
+            "Hostname '%s' resolved to %s (expected: %s, match: %s)",
+            hostname,
+            resolved_ip,
+            request.expected_ip,
+            matches,
+        )
+
+        # Check if OCT is reachable at hostname:port
+        oct_reachable, oct_error = await _check_oct_reachability(hostname, port)
+
+        return ValidateHostnameResponse(
+            resolvable=True,
+            resolved_ip=resolved_ip,
+            matches_expected=matches,
+            oct_reachable=oct_reachable,
+            error=None,
+            oct_error=oct_error,
+        )
+
+    except socket.gaierror as e:
+        logger.warning("DNS resolution failed for '%s': %s", hostname, e)
+        # Provide user-friendly error message based on errno
+        if e.errno == -2:  # EAI_NONAME
+            user_msg = f"Hostname '{hostname}' could not be resolved"
+        elif e.errno == -3:  # EAI_AGAIN
+            user_msg = f"DNS server temporarily unavailable for '{hostname}'"
+        elif e.errno == -5:  # EAI_NODATA
+            user_msg = f"No IP address found for hostname '{hostname}'"
+        else:
+            user_msg = f"DNS resolution failed for '{hostname}'"
+
+        return ValidateHostnameResponse(
+            resolvable=False,
+            resolved_ip=None,
+            matches_expected=None,
+            oct_reachable=False,
+            error=user_msg,
+            oct_error=None,
+        )
+    except Exception:
+        logger.exception("Unexpected error during DNS validation")
+        return ValidateHostnameResponse(
+            resolvable=False,
+            resolved_ip=None,
+            matches_expected=None,
+            oct_reachable=False,
+            error=f"Could not validate hostname '{hostname}'",
+            oct_error=None,
+        )
 
 
 @wizard_router.post("/wizard/check-ports", response_model=PortCheckResponse)

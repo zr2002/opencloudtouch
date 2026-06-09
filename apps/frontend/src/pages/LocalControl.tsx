@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import DeviceSwiper, { Device } from "../components/DeviceSwiper";
@@ -7,6 +7,7 @@ import NowPlaying from "../components/NowPlaying";
 import VolumeSlider from "../components/VolumeSlider";
 import SetupBadge from "../components/SetupBadge";
 import DeviceOfflineBanner from "../components/DeviceOfflineBanner";
+import DeviceNameEditor from "../components/DeviceNameEditor";
 import { useNowPlaying } from "../hooks/useNowPlaying";
 import { useVolume } from "../hooks/useVolume";
 import { useZones } from "../hooks/useZones";
@@ -36,6 +37,7 @@ interface LocalControlProps {
 
 export default function LocalControl({ devices = [] }: LocalControlProps) {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0);
   const [selectedSource, setSelectedSource] = useState<SourceId>("INTERNET_RADIO");
   const [keyLoading, setKeyLoading] = useState<string | null>(null);
@@ -47,6 +49,25 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
   const { nowPlaying, deviceOffline: hookOffline } = useNowPlaying(deviceId);
   const deviceOffline = hookOffline || (deviceId ? isDeviceOfflineInStore(deviceId) : false);
   const { volume, muted, setDeviceVolume, toggleMute } = useVolume(deviceId);
+
+  // Auto-select device from URL parameter
+  useEffect(() => {
+    const deviceParam = searchParams.get("device");
+    if (deviceParam && devices.length > 0) {
+      const idx = devices.findIndex((d) => d.device_id === deviceParam);
+      if (idx !== -1) setCurrentDeviceIndex(idx);
+    }
+  }, [searchParams, devices]);
+
+  const handleDeviceChange = useCallback(
+    (index: number) => {
+      setCurrentDeviceIndex(index);
+      if (devices[index]) {
+        setSearchParams({ device: devices[index].device_id }, { replace: true });
+      }
+    },
+    [devices, setSearchParams]
+  );
   const { zones } = useZones();
 
   const deviceZone = useMemo(() => {
@@ -108,7 +129,7 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
       <DeviceSwiper
         devices={devices}
         currentIndex={currentDeviceIndex}
-        onIndexChange={setCurrentDeviceIndex}
+        onIndexChange={handleDeviceChange}
       >
         <div className="control-card">
           {/* Device Header: Power (left) | Name | Settings (right) */}
@@ -124,8 +145,12 @@ export default function LocalControl({ devices = [] }: LocalControlProps) {
                 {keyLoading === "POWER" ? "⏳" : "⏻"}
               </button>
             </div>
-            <div className="device-header-info">
-              <h2 className="device-name">{currentDevice?.name}</h2>
+            <div className="device-info">
+              {currentDevice ? (
+                <DeviceNameEditor deviceId={currentDevice.device_id} name={currentDevice.name} />
+              ) : (
+                <h2 className="device-name">Unknown Device</h2>
+              )}
               <span className="device-model">{currentDevice?.model || "Unknown Model"}</span>
             </div>
             <div className="device-header-right">

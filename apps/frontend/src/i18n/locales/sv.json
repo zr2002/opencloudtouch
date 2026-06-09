@@ -1,4 +1,4 @@
-﻿{
+{
   "common": {
     "cancel": "Avbryt",
     "loading": "Laddar...",
@@ -62,18 +62,10 @@
     "infoItem1": "Klicka på en tom förinställning för att tilldela en station",
     "infoItem2": "Klicka på en tilldelad station för att ändra eller ta bort den",
     "infoItem3": "Den gröna ► knappen spelar stationen direkt",
-    "infoItem4": "Gult markerade förinställningar beror på Bose Cloud — omkonfigurering rekommenderas",
-    "infoItem5": "âš™ï¸ Ã¶ppnar enhetens installationsguide",
+    "infoItem5": "⚙️ öppnar enhetens installationsguide",
     "infoItem6": "\"Hämta från enhet\" synkroniserar förinställningar från SoundTouch",
     "changeStation": "Klicka för att byta station",
     "assignPreset": "Tilldela förinställning",
-    "cloudCompatible": "Kompatibel efter molnstängning",
-    "cloudIndependent": "Molnoberoende",
-    "cloudIndependentDesc": "Fungerar efter 6 maj 2026 (Bose Cloud-stängning)",
-    "cloudDependent": "Molnberoende",
-    "cloudDependentDesc": "Den här förinställningen kan kräva Bose Cloud-tjänster",
-    "cloudDependentTunein": "TuneIn-förinställningar kräver Bose Cloud (streaming.bose.com)",
-    "cloudDependentNote": "Kan vara otillgänglig efter 6 maj 2026. Överväg att konfigurera om med direkta strömmar.",
     "searchClose": "Stäng sökning",
     "searchLoading": "Söker...",
     "searchEmpty": "Inga stationer hittades",
@@ -344,8 +336,8 @@
         "q2": "Är det bara kända, betrodda personer som har åtkomst till ditt Wi-Fi-nätverk?",
         "q3": "Planerar du att installera firmwareuppdateringar för den här SoundTouch-enheten inom den närmaste framtiden?",
         "answerYes": "✅ Ja",
-        "answerNo": "âŒ Nej",
-        "answerUnknown": "â“ Vet ej",
+        "answerNo": "❌ Nej",
+        "answerUnknown": "❓ Vet ej",
         "riskLabel": "Risk:",
         "riskLow": "Låg",
         "riskMedium": "Medel",
@@ -359,7 +351,7 @@
         "advancedWhy": "När behövs detta?",
         "advancedWhyText": "Bara om det automatiska testet ovan misslyckas och du vill verifiera anslutningen själv. I den normala processen kan du hoppa över det här steget.",
         "advancedDesc": "SoundTouch-enheter kräver äldre SSH-algoritmer.",
-        "tabTerminal": "ðŸ–¥ï¸ Terminal (Linux / macOS)",
+        "tabTerminal": "🖥️ Terminal (Linux / macOS)",
         "tabPuTTY": "🪟 PuTTY (Windows)",
         "puttyStep1": "Session: Host Name = {{ip}}, Port = 22, Connection type = SSH",
         "puttyStep2": "Connection → SSH → Kex: placera Diffie-Hellman group 1 högst upp",
@@ -367,7 +359,7 @@
         "puttyStep4": "Connection → SSH → Auth: aktivera 'Allow attempted changes of username'; i Host keys ta bort rsa-sha2-256 och rsa-sha2-512, behåll bara ssh-rsa",
         "puttyStep5": "Login: Username = root, Password = tomt (tryck Enter)",
         "sshPasswordHint": "Lösenord: lämna tomt (tryck Enter)",
-        "troubleshootingTitle": "âš ï¸ FelsÃ¶kning",
+        "troubleshootingTitle": "⚠️ Felsökning",
         "troubleshootingItem1": "Kontrollera att USB-enheten är korrekt isatt",
         "troubleshootingItem2": "Kontrollera att filen 'remote_services' är korrekt",
         "troubleshootingItem3": "Vänta minst 60 sekunder efter omstart",
@@ -384,7 +376,7 @@
         "btnCreate": "Skapa säkerhetskopia nu",
         "btnCreating": "Skapar säkerhetskopia...",
         "progressMessage": "Skapar säkerhetskopia för {{device}}",
-        "progressNote": "Det kan ta upp till 5 minuter...",
+        "progressNote": "Det kan ta upp till 2 minuter...",
         "errorTitle": "Säkerhetskopiering misslyckades",
         "successTitle": "Säkerhetskopia skapad!",
         "successHint": "Säkerhetskopiorna sparades på USB-enheten. Ta ut enheten efter guiden — den innehåller återställningsfiler.",
@@ -431,7 +423,13 @@
         "oldUrl": "Gammal URL:",
         "newUrl": "Ny URL:",
         "backupLabel": "Säkerhetskopia:",
-        "errorTitle": "Ändring misslyckades"
+        "errorTitle": "Ändring misslyckades",
+        "dnsWarningTitle": "DNS-varning",
+        "octUnreachableTitle": "Servern kan inte nås",
+        "dnsUnresolvable": "Detta värdnamn kunde inte matchas via DNS. Högtalaren kanske inte kan nå din server.",
+        "dnsMismatch": "Hostname resolved to {{resolved}}, but the expected server IP is {{expected}}. This mismatch may cause connection issues.",
+        "dnsProceed": "Proceed anyway",
+        "dnsCheckFailed": "DNS validation could not be performed."
       },
       "step6": {
         "title": "Ändra hosts-filen",
@@ -755,5 +753,11 @@
     "setupStatus": "Konfigurationsstatus",
     "lastSeen": "Senast sedd",
     "downloadBundle": "Ladda ner supportpaket"
+  },
+  "deviceRename": {
+    "clickToEdit": "Klicka för att byta namn",
+    "inputLabel": "Enhetsnamn",
+    "tooLong": "Namnet får ha max 30 tecken",
+    "failed": "Det gick inte att byta namn"
   }
 }

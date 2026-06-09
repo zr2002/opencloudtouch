@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,7 @@ import NowPlaying from "../components/NowPlaying";
 import PresetButton from "../components/PresetButton";
 import SetupBadge from "../components/SetupBadge";
 import DeviceOfflineBanner from "../components/DeviceOfflineBanner";
+import DeviceNameEditor from "../components/DeviceNameEditor";
 import RadioSearch, { RadioStation } from "../components/RadioSearch";
 import VolumeSlider from "../components/VolumeSlider";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -31,7 +32,7 @@ interface RadioPresetsProps {
 
 export default function RadioPresets({ devices = [], onRemoveDevice }: RadioPresetsProps) {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [assigningPreset, setAssigningPreset] = useState<number | null>(null);
@@ -75,6 +76,16 @@ export default function RadioPresets({ devices = [], onRemoveDevice }: RadioPres
     // Intentionally omit currentDeviceIndex: re-running on every arrow-key change
     // would override the user's manual selection back to the URL device.
   }, [searchParams, devices]);
+
+  const handleDeviceChange = useCallback(
+    (index: number) => {
+      setCurrentDeviceIndex(index);
+      if (devices[index]) {
+        setSearchParams({ device: devices[index].device_id }, { replace: true });
+      }
+    },
+    [devices, setSearchParams]
+  );
 
   const handleSyncPresets = async () => {
     try {
@@ -178,33 +189,39 @@ export default function RadioPresets({ devices = [], onRemoveDevice }: RadioPres
       <DeviceSwiper
         devices={devices}
         currentIndex={currentDeviceIndex}
-        onIndexChange={setCurrentDeviceIndex}
+        onIndexChange={handleDeviceChange}
       >
         <div className="device-card" data-test="device-card">
           <div className="device-card-header">
-            <button
-              className={`power-header-btn ${isStandby ? "off" : "on"}`}
-              onClick={async () => {
-                if (!currentDevice?.device_id || powerLoading || deviceOffline) return;
-                setPowerLoading(true);
-                try {
-                  await power(currentDevice.device_id);
-                } catch (err) {
-                  console.error("[RadioPresets] Power failed:", err);
-                } finally {
-                  setPowerLoading(false);
-                }
-              }}
-              disabled={powerLoading || deviceOffline}
-              aria-label={t("player.powerButton")}
-              title={t("player.powerButton")}
-            >
-              {powerLoading ? "⏳" : "⏻"}
-            </button>
+            <div className="device-header-left">
+              <button
+                className={`power-header-btn ${isStandby ? "off" : "on"}`}
+                onClick={async () => {
+                  if (!currentDevice?.device_id || powerLoading || deviceOffline) return;
+                  setPowerLoading(true);
+                  try {
+                    await power(currentDevice.device_id);
+                  } catch (err) {
+                    console.error("[RadioPresets] Power failed:", err);
+                  } finally {
+                    setPowerLoading(false);
+                  }
+                }}
+                disabled={powerLoading || deviceOffline}
+                aria-label={t("player.powerButton")}
+                title={t("player.powerButton")}
+              >
+                {powerLoading ? "⏳" : "⏻"}
+              </button>
+            </div>
             <div className="device-info">
-              <h2 className="device-name" data-test="device-name">
-                {currentDevice?.name || "Unknown Device"}
-              </h2>
+              {currentDevice ? (
+                <DeviceNameEditor deviceId={currentDevice.device_id} name={currentDevice.name} />
+              ) : (
+                <h2 className="device-name" data-test="device-name">
+                  Unknown Device
+                </h2>
+              )}
               <span className="device-model" data-test="device-model">
                 {currentDevice?.model || "Unknown Model"}
               </span>
@@ -212,12 +229,14 @@ export default function RadioPresets({ devices = [], onRemoveDevice }: RadioPres
                 {currentDevice?.ip || "Unknown IP"}
               </span>
             </div>
-            {currentDevice && (
-              <SetupBadge
-                deviceId={currentDevice.device_id}
-                setupStatus={currentDevice.setup_status}
-              />
-            )}
+            <div className="device-header-right">
+              {currentDevice && (
+                <SetupBadge
+                  deviceId={currentDevice.device_id}
+                  setupStatus={currentDevice.setup_status}
+                />
+              )}
+            </div>
           </div>
 
           {/* Device Offline Banner */}
@@ -356,7 +375,6 @@ export default function RadioPresets({ devices = [], onRemoveDevice }: RadioPres
             <li>{t("presets.infoItem1")}</li>
             <li>{t("presets.infoItem2")}</li>
             <li>{t("presets.infoItem3")}</li>
-            <li>{t("presets.infoItem4")}</li>
             <li>{t("presets.infoItem5")}</li>
             <li>{t("presets.infoItem6")}</li>
           </ul>

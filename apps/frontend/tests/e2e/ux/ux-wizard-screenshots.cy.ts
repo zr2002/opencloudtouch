@@ -58,10 +58,10 @@ const BACKUP_SUCCESS = {
 const CONFIG_SUCCESS = {
   success: true,
   action: "modified",
-  old_url: "bmx.bose.com",
+  old_url: "https://*.bose.com (4 URLs)",
   new_url: "192.168.1.11",
   backup_path: "/usb/backups/config_backup.xml",
-  diff: "- bmx.bose.com\n+ 192.168.1.11",
+  diff: "- https://*.bose.com (4 URLs)\n+ 192.168.1.11",
   message: "Konfiguration erfolgreich geändert",
 };
 
@@ -231,6 +231,18 @@ function setupWizardMocks() {
     statusCode: 200,
     body: BACKUP_SUCCESS,
   }).as("createBackup");
+
+  cy.intercept("POST", "/api/setup/wizard/validate-hostname", {
+    statusCode: 200,
+    body: {
+      resolvable: true,
+      resolved_ip: "127.0.0.1",
+      matches_expected: true,
+      oct_reachable: true,
+      error: null,
+      oct_error: null,
+    },
+  }).as("validateHostname");
 
   cy.intercept("POST", "/api/setup/wizard/modify-config", {
     statusCode: 200,
@@ -539,7 +551,7 @@ describe("UX Screenshots — Setup Wizard (Vollständiger Durchlauf)", () => {
 
     it("wiz_04b — Konfiguration: Erfolgreich geändert (zeigt alte + neue URL)", () => {
       cy.contains("button", /konfiguration.*ndern/i, { timeout: 8000 }).click({ force: true });
-      cy.contains("bmx.bose.com", { timeout: 10000 }).should("exist");
+      cy.contains("https://*.bose.com (4 URLs)", { timeout: 10000 }).should("exist");
       cy.contains("192.168.1.11").should("exist");
       screenshotBoth("wiz_04b_config__success-urls-visible");
     });
