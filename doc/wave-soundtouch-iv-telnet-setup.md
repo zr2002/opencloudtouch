@@ -1,16 +1,23 @@
 # Wave SoundTouch IV — Telnet Port 17000 Setup Guide
 
-**Status:** 🧪 Experimental — Testing in progress  
-**Applies to:** Bose Wave SoundTouch IV (sm2 firmware, all versions)  
-**Alternative to:** USB provisioning, ETAP serial cable
+**Status:** ✅ Community-Verified (SoundCork Issue #309)  
+**Applies to:** Bose Wave SoundTouch IV (sm2 firmware 27.0.6, 15.x, 9.x)  
+**Alternative to:** USB provisioning (not supported on Wave IV)
 
 ---
 
 ## Overview
 
-The **Wave SoundTouch IV** does not support USB provisioning via the standard `remote_services` method. However, it provides **Telnet access on port 17000** with a limited but sufficient command set to configure OpenCloudTouch URLs.
+The **Wave SoundTouch IV** does not support USB provisioning via the standard `remote_services` method. However, it provides **Telnet access on port 17000** with a sufficient command set to configure OpenCloudTouch server URLs.
 
-This guide shows how to configure your Wave SoundTouch IV without opening the device or using special cables.
+This method is **simpler than ETAP serial cable** and requires no hardware modification or device disassembly.
+
+### Community Success
+
+- ✅ **@akpdw** (SoundCork): Provided working command syntax
+- ✅ **@jakovasaur** (SoundCork): Confirmed all commands working on firmware 27.0.6
+- ✅ **@pointy56** (SoundCork): Verified Telnet 17000 + ETAP serial methods
+- ✅ Multiple OpenCloudTouch community members (testing in progress)
 
 ---
 
@@ -62,10 +69,11 @@ Escape character is '^]'.
 
 ## Step 3: Configure OpenCloudTouch URLs
 
-Run the following commands one by one.  
-**Replace `<oct-server>` with your OpenCloudTouch server's hostname or IP address.**
+**⚠️ CRITICAL:** Type commands carefully. Telnet has **no prompt feedback** — just type and press Enter.
 
-### If using hostname (e.g., `opencloudtouch.local`):
+Copy-paste the commands below ONE BY ONE, replacing `<oct-server>` with your server's hostname or IP.
+
+### Example: Using hostname `opencloudtouch.local`
 
 ```bash
 sys configuration bmxRegistryUrl http://opencloudtouch.local:8080/bmx/registry/v1/services
@@ -75,7 +83,7 @@ sys configuration swUpdateUrl http://opencloudtouch.local:8080/updates/soundtouc
 envswitch boseurls set http://opencloudtouch.local:8080/marge http://opencloudtouch.local:8080/updates/soundtouch
 ```
 
-### If using IP address (e.g., `192.168.1.50`):
+### Example: Using IP address `192.168.1.50`
 
 ```bash
 sys configuration bmxRegistryUrl http://192.168.1.50:8080/bmx/registry/v1/services
@@ -85,7 +93,11 @@ sys configuration swUpdateUrl http://192.168.1.50:8080/updates/soundtouch
 envswitch boseurls set http://192.168.1.50:8080/marge http://192.168.1.50:8080/updates/soundtouch
 ```
 
-**⚠️ Important:** Use **`http://`** (not `https://`) and include the **port** if not using 80.
+**⚠️ Important Notes:**
+- Use **`http://`** (not `https://`)
+- Include the **port number** (default OCT: `8080`, default SoundCork: `8000`)
+- Wave IV firmware does **NOT** support TLS/HTTPS on these endpoints
+- `.home` TLD may cause issues — prefer `.local` or IP addresses
 
 ---
 
@@ -153,12 +165,30 @@ sys reboot
 
 **Symptom:** `Command not found` or no response
 
+**Root Cause:** Limited command set in older firmware versions
+
 **Solutions:**
-1. Wave SoundTouch IV firmware **27.0.6** confirmed working
-2. Older firmware (15.x, 9.x) may have limited command set
-3. Try updating Wave firmware via Bose app before cloud shutdown, or:
-4. Download firmware from [archive.org/details/bose-soundtouch-software-and-firmware](https://archive.org/details/bose-soundtouch-software-and-firmware)
-5. Update via `http://203.0.113.1:17008/update.html` (requires factory reset first)
+
+1. **Check current firmware:**
+   - Bose SoundTouch app → Device Settings → About
+   - Expected: **27.0.6** (latest official version)
+
+2. **Firmware update via Micro-USB:**
+   - Download Wave IV firmware from [archive.org/details/bose-soundtouch-software-and-firmware](https://archive.org/details/bose-soundtouch-software-and-firmware)
+   - File: `bose-wave-soundtouch-27.0.6.bin`
+   - Connect Wave via Micro-USB cable to computer
+   - Open browser: `http://203.0.113.1:17008/update.html`
+   - Upload `.bin` file
+   - Wait 10-15 minutes (LED blinks during update)
+
+3. **Factory reset before firmware update (if needed):**
+   - Unplug power
+   - Hold **Preset 1 + Volume Down**
+   - Plug power while holding buttons
+   - Release when LED blinks rapidly (10-15 seconds)
+   - Wait 2-3 minutes for reset to complete
+
+**⚠️ Warning:** Factory reset erases all presets, network settings, and zones
 
 ### Wave still contacts Bose cloud after reboot
 
@@ -189,22 +219,48 @@ sys reboot
 
 ## Advanced: ETAP Serial Cable Alternative
 
-If Telnet does not work for your Wave, you can use the **Service Port** (3.5mm jack) with a serial UART adapter.
+If Telnet port 17000 does not work (rare, but possible on very old firmware), you can use the **Service Port** (3.5mm jack) with a serial UART adapter.
 
-**Hardware needed:**
-- FTDI USB-UART adapter (e.g., CP2102, FT232RL)
-- 3.5mm TRRS cable (Tip-Ring-Ring-Sleeve)
-- Wiring: **Tip=RX, Ring=TX, Sleeve=GND**
-- Signal inversion required (configure via FT_Prog utility)
+### Hardware Requirements
 
-**Serial settings:**
-- Baud rate: 115200
-- Data bits: 8
-- Parity: None
-- Stop bits: 1
-- Flow control: None
+- **FTDI USB-UART adapter** (e.g., CP2102, FT232RL)
+- **3.5mm TRRS cable** (4-conductor: Tip-Ring-Ring-Sleeve)
+- **Pinout:** Tip=RX, Ring=TX, Ring2=NC, Sleeve=GND
+- **Signal inversion required** — FTDI signals must be inverted via FT_Prog utility (Windows) or ftdi_eeprom (Linux)
 
-**Detailed guide:** See [SoundCork Issue #309](https://github.com/deborahgu/soundcork/issues/309) by @pointy56
+### Serial Settings
+
+- Baud rate: **115200**
+- Data bits: **8**
+- Parity: **None**
+- Stop bits: **1**
+- Flow control: **None**
+
+### UBoot Access Method
+
+1. Connect serial cable to Wave's Service Port (3.5mm jack on pedestal)
+2. Open terminal (PuTTY, screen, minicom) with settings above
+3. Boot Wave and watch serial output
+4. Press **Shift+U** when "Autoboot in 1 seconds..." appears
+5. UBoot prompt: `=>` appears
+6. Enable remote_services:
+   ```bash
+   setenv optargs init=/bin/sh
+   setenv rootfs_perms rw
+   run nand_boot  # or run nand_boot2 depending on kernel
+   ```
+7. At shell prompt `sh-3.2#`:
+   ```bash
+   touch /etc/remote_services
+   reboot -f
+   ```
+
+**Detailed step-by-step guide:** [SoundCork Issue #309](https://github.com/deborahgu/soundcork/issues/309) by @pointy56
+
+**When to use this:**
+- Telnet port 17000 not available (check with `telnet <ip> 17000`)
+- Very old firmware (pre-9.x) without Telnet support
+- Advanced troubleshooting or bootloop recovery
 
 ---
 
