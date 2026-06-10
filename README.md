@@ -222,3 +222,24 @@ Join the conversation in [GitHub Discussions](https://github.com/opencloudtouch/
 ## License
 
 [Apache License 2.0](LICENSE) — see [NOTICE](NOTICE) for trademark details.
+
+## Supported Devices
+
+OpenCloudTouch is tested and verified to work with the following Bose® SoundTouch® models:
+
+### Fully Supported ✅
+
+- **SoundTouch 10** (firmware 27.0.6) — Most tested model
+- **SoundTouch 20** (firmware 27.0.6) — Includes Series I, II, III
+- **SoundTouch 30** (firmware 27.0.6) — Includes Series I, II, III
+- **SoundTouch 300** (firmware 27.0.6) — Soundbar
+- **SoundTouch Portable** (firmware 27.0.6) — Battery-powered
+
+### Experimental ⚠️
+
+- **Wave SoundTouch Music System IV** (firmware 27.0.6) — Preset sync issues reported ([#340](https://github.com/opencloudtouch/opencloudtouch/issues/340)). Setup wizard works, but Marge preset sync may not function correctly. Under investigation.
+- **Bose SA-4 (SoundTouch Wireless Adapter)** (firmware 27.0.6) — USB-less setup required ([#205](https://github.com/opencloudtouch/opencloudtouch/issues/205))
+
+OCT is developed and tested with **Firmware 27.0.6** (latest official Bose firmware before cloud shutdown). Older firmware versions *may* work but are not officially supported.
+
+Have a device not listed here? Open an issue with your device model, firmware version, and test results!
