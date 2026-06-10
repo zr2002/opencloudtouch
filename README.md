@@ -238,10 +238,10 @@ OpenCloudTouch is tested and verified to work with the following Bose® SoundTou
 ### Alternative Setup Available ⚙️
 
 - **Bose SA-4 (SoundTouch Wireless Adapter)** (firmware 27.0.6) — Alternative setup method available. See [Discussion #177](https://github.com/opencloudtouch/opencloudtouch/discussions/177) for community-verified instructions by @TomS1985.
+- **Wave SoundTouch Music System IV** (firmware 27.0.6) — Telnet Port 17000 setup method available (no USB needed). See [Telnet Setup Guide](doc/wave-soundtouch-iv-telnet-setup.md) for step-by-step instructions. Wizard integration in progress — see [#352](https://github.com/opencloudtouch/opencloudtouch/issues/352).
 
 ### Community Testing 🧪
 
-- **Wave SoundTouch Music System IV** (firmware 27.0.6) — Basic functionality confirmed. Some setup challenges reported — see [#340](https://github.com/opencloudtouch/opencloudtouch/issues/340) and [Discussion #316](https://github.com/opencloudtouch/opencloudtouch/discussions/316) for details and workarounds.
 - **Bose SA-5 (SoundTouch Amplifier)** (firmware 27.0.6) — Community testing in progress. See [#349](https://github.com/opencloudtouch/opencloudtouch/issues/349) for current status and discussion.
 
 ### Looking for Community Reports ❓
