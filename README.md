@@ -222,3 +222,54 @@ Join the conversation in [GitHub Discussions](https://github.com/opencloudtouch/
 ## License
 
 [Apache License 2.0](LICENSE) — see [NOTICE](NOTICE) for trademark details.
+
+## Supported Devices
+
+OpenCloudTouch is tested and verified to work with the following Bose® SoundTouch® models:
+
+### Fully Supported ✅
+
+- **SoundTouch 10** (firmware 27.0.6) — Most tested model
+- **SoundTouch 20** (firmware 27.0.6) — Includes Series I, II, III
+- **SoundTouch 30** (firmware 27.0.6) — Includes Series I, II, III
+- **SoundTouch 300** (firmware 27.0.6) — Soundbar
+- **SoundTouch Portable** (firmware 27.0.6) — Battery-powered
+
+### Alternative Setup Available ⚙️
+
+- **Bose SA-4 (SoundTouch Wireless Adapter)** (firmware 27.0.6) — Alternative setup method available. See [Discussion #177](https://github.com/opencloudtouch/opencloudtouch/discussions/177) for community-verified instructions by @TomS1985.
+- **Wave SoundTouch Music System IV** (firmware 27.0.6) — Telnet Port 17000 setup method available (no USB needed). See [Telnet Setup Guide](doc/wave-soundtouch-iv-telnet-setup.md) for step-by-step instructions. Wizard integration in progress — see [#352](https://github.com/opencloudtouch/opencloudtouch/issues/352).
+
+### Community Testing 🧪
+
+- **Bose SA-5 (SoundTouch Amplifier)** (firmware 27.0.6) — Community testing in progress. See [#349](https://github.com/opencloudtouch/opencloudtouch/issues/349) for current status and discussion.
+
+### Looking for Community Reports ❓
+
+- **Bose Lifestyle 600/650** — These models internally use SoundTouch technology. Interested in testing? Check out [Discussion #214](https://github.com/opencloudtouch/opencloudtouch/discussions/214) for setup hints.
+- **Bose Cinemate 120/130** — Basic device recognition confirmed. Community reports welcome — see [Discussion #242](https://github.com/opencloudtouch/opencloudtouch/discussions/242).
+
+### Unsupported ❌
+
+- **Non-SoundTouch devices** — OCT only supports devices with SoundTouch firmware.
+
+---
+
+## Firmware Compatibility
+
+OCT is developed and tested with **Firmware 27.0.6** (latest official Bose firmware). Older firmware versions *may* work but compatibility is not guaranteed.
+
+To check your firmware version, access your device settings via the Bose app and look for "Firmware version" or "About".
+
+---
+
+## Community Testing Program
+
+Have a device not listed here? We'd love to hear from you! Start a [discussion](https://github.com/opencloudtouch/opencloudtouch/discussions) or open an [issue](https://github.com/opencloudtouch/opencloudtouch/issues) with:
+
+- Device model and firmware version
+- What you tested (discovery, setup wizard, presets, zones)
+- Any workarounds you've found
+
+Your feedback helps expand official support and assists other community members with similar hardware!
+

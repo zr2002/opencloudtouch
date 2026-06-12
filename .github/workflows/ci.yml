@@ -15,6 +15,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday 6:00 UTC (for main branch SonarCloud scans)
+
   workflow_dispatch:
 
 # Least-privilege: no default permissions. Jobs declare what they need.
@@ -39,6 +42,111 @@ jobs:
 
       - name: Check for CP1252-as-UTF8 encoding corruption
         run: python scripts/check-mojibake.py .
+
+  # ============================================================================
+  # COMMIT MESSAGE VALIDATION
+  # ============================================================================
+  commit-lint:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Full history for commit validation
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install commitlint
+        run: |
+          npm install -g @commitlint/cli @commitlint/config-conventional
+
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$PR_TITLE" | commitlint
+
+      - name: Validate commit messages
+        run: |
+          # Get commits in PR
+          git fetch origin ${{ github.base_ref }}
+          COMMITS=$(git log origin/${{ github.base_ref }}..HEAD --pretty=format:"%s")
+
+          echo "📝 Validating commits in PR..."
+          echo ""
+
+          # Validate each commit
+          EXIT_CODE=0
+          while IFS= read -r commit; do
+            # Skip merge commits (not subject to Conventional Commits)
+            if echo "$commit" | grep -qE "^[Mm]erge[ :]"; then
+              echo "⏭️  Skipping merge commit: $commit"
+              continue
+            fi
+            echo "Checking: $commit"
+            if ! echo "$commit" | commitlint; then
+              EXIT_CODE=1
+            fi
+          done <<< "$COMMITS"
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "❌ Some commits don't follow Conventional Commits format!"
+            echo ""
+            echo "📖 Format: <type>(<scope>): <subject>"
+            echo ""
+            echo "Examples:"
+            echo "  ✅ feat(devices): add SSDP auto-discovery"
+            echo "  ✅ fix(api): handle null response"
+            echo "  ✅ docs(readme): update installation"
+            echo ""
+            echo "Allowed types:"
+            echo "  feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All commits follow Conventional Commits format!"
+
+      - name: PR comment on failure
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ❌ Commit Message Validation Failed
+
+            Your PR contains commits that don't follow the [Conventional Commits](https://www.conventionalcommits.org/) format.
+
+            ### Required Format
+            \`\`\`
+            <type>(<scope>): <subject>
+            \`\`\`
+
+            ### Examples
+            ✅ \`feat(devices): add SSDP auto-discovery\`
+            ✅ \`fix(api): handle null response\`
+            ✅ \`docs(readme): update installation\`
+
+            ### Allowed Types
+            \`feat\`, \`fix\`, \`docs\`, \`style\`, \`refactor\`, \`perf\`, \`test\`, \`build\`, \`ci\`, \`chore\`, \`revert\`
+
+            📖 See [Conventional Commits](https://www.conventionalcommits.org/) for details.
+            `,
+            });
 
   # ============================================================================
   # SECURITY SCANNING
@@ -75,6 +183,65 @@ jobs:
       - name: Run npm audit (Frontend vulnerabilities)
         working-directory: apps/frontend
         run: npm audit --production --audit-level=high
+
+  # ============================================================================
+  # LICENSE CHECK
+  # ============================================================================
+  license-check:
+    name: License Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # ── Frontend (npm) ──────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Check frontend licenses
+        run: |
+          npx license-checker-rseidelsohn \
+            --start apps/frontend \
+            --production \
+            --excludePrivatePackages \
+            --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;Unlicense;CC0-1.0;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0;Artistic-2.0" \
+            --summary
+
+      # ── Backend (pip) ───────────────────────────────────────────────────────
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install backend dependencies
+        run: |
+          pip install pip-licenses
+          pip install -r apps/backend/requirements.txt
+
+      - name: Check backend licenses
+        # asyncssh is an approved dependency: EPL-2.0 (Eclipse Public License 2.0)
+        # is weak-copyleft — only applies to modifications of asyncssh itself, not
+        # to embedding projects. Excluded via --ignore-packages because its SPDX
+        # composite expression "EPL-2.0 OR GPL-2.0-or-later" contains "GPL-2.0-or-later"
+        # as a substring, which would otherwise trigger the --fail-on check.
+        #
+        # LGPL is intentionally NOT in the deny-list: LGPL-2.1 only requires open-
+        # sourcing modifications to the LGPL library itself, not embedding code.
+        # zeroconf (mDNS discovery) is LGPL-2.1 and safe to use here.
+        run: |
+          pip-licenses \
+            --format=markdown \
+            --order=license \
+            --ignore-packages asyncssh \
+            --fail-on="GNU General Public License;GNU Affero General Public License;European Union Public Licence;GPL-2.0-only;GPL-2.0-or-later;GPL-3.0-only;GPL-3.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later;EUPL-1.1;EUPL-1.2"
 
   # ============================================================================
   # LINTING
@@ -390,7 +557,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [mojibake-check, security, lint, backend-tests, frontend-tests, e2e-tests]
+    needs: [mojibake-check, commit-lint, security, license-check, lint, backend-tests, frontend-tests, e2e-tests]
     if: always()
     permissions:
       pull-requests: write
@@ -417,7 +584,9 @@ jobs:
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Mojibake Check| ${{ needs.mojibake-check.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit Lint   | ${{ needs.commit-lint.result == 'success' && 'Passed' || needs.commit-lint.result == 'skipped' && 'Skipped' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scan | ${{ needs.security.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| License Check | ${{ needs.license-check.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Lint          | ${{ needs.lint.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Backend Tests | ${{ needs.backend-tests.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Frontend Tests| ${{ needs.frontend-tests.result == 'success' && 'Passed' || 'Failed' }} |" >> $GITHUB_STEP_SUMMARY
@@ -437,9 +606,12 @@ jobs:
         # NOTE: e2e-tests is NOT checked here — it has its own job status
         # which keeps the overall run red when it fails. Summary only gates
         # on core jobs to avoid redundant red marks.
+        # NOTE: commit-lint is PR-only and may be skipped, so we check for both success and skipped.
         run: |
-          if [[ "${{ needs.mojibake-check.result }}" != "success" ]] || \
+          if [[ "${{ needs.commit-lint.result }}" != "success" && "${{ needs.commit-lint.result }}" != "skipped" ]] || \
+             [[ "${{ needs.mojibake-check.result }}" != "success" ]] || \
              [[ "${{ needs.security.result }}" != "success" ]] || \
+             [[ "${{ needs.license-check.result }}" != "success" ]] || \
              [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.backend-tests.result }}" != "success" ]] || \
              [[ "${{ needs.frontend-tests.result }}" != "success" ]]; then
@@ -454,14 +626,16 @@ jobs:
             const statusIcon = (result) => result === 'success' ? '✅' : result === 'skipped' ? '⏭️' : '❌';
             const jobs = [
               ['Mojibake Check', '${{ needs.mojibake-check.result }}'],
+              ['Commit Lint', '${{ needs.commit-lint.result }}'],
               ['Security Scan', '${{ needs.security.result }}'],
+              ['License Check', '${{ needs.license-check.result }}'],
               ['Lint', '${{ needs.lint.result }}'],
               ['Backend Tests', '${{ needs.backend-tests.result }}'],
               ['Frontend Tests', '${{ needs.frontend-tests.result }}'],
               ['E2E Tests', '${{ needs.e2e-tests.result }}'],
             ];
 
-            const allPassed = jobs.every(([_, r]) => r === 'success');
+            const allPassed = jobs.every(([_, r]) => r === 'success' || r === 'skipped');
             const header = allPassed ? '## ✅ CI Passed' : '## ❌ CI Failed';
 
             let body = `${header}\n\n`;
