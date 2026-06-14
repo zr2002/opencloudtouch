@@ -1,0 +1,25 @@
+name: Automatisch Upstream synchronisieren
+
+on:
+  schedule:
+    # Läuft jeden Tag um Mitternacht UTC (00:00)
+    - cron: '0 0 * * *'
+  # Erlaubt es dir, den Sync auch jederzeit manuell unter "Actions" zu starten
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout des eigenen Repos
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Synchronisiere mit dem Original
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1
+        with:
+          target_sync_branch: main        # Name deines Branches (meist main oder master)
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          upstream_sync_branch: main      # Branch-Name des Original-Entwicklers
+          upstream_sync_repo: opencloudtouch/opencloudtouch
